@@ -11,7 +11,7 @@ axes.linewidth: 2
 
 # Lines
 lines.linewidth : 3
-lines.markersize : 10
+lines.markersize : 2
 
 # Axis Ticks
 xtick.labelsize: 16
