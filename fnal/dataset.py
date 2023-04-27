@@ -20,9 +20,69 @@ class Dataset:
         """
         plt.style.use('plot_style.mplstyle')
         data = uproot.open(f'{path}/run{run}.root')
+        self.chmap = pd.read_csv('channel_map.csv')
         self.correlations = data['tpcnoiseartdaq/tpccorrelation'].arrays(library='pd')
-        self.noise = data['tpcnoiseartdaq/tpcnoise'].arrays(library='pd')
+        self._get_noise(data['tpcnoiseartdaq/tpcnoise'].arrays(library='pd'))
         self.indexer = {int(i*(i+1)/2) + j: (i, j) for i in range(576) for j in range(i+1)}
+
+    def plot_crate(self, crate_name='WW19') -> None:
+        """
+        Plot the noise per channel of a single mini-crate.
+
+        Parameters
+        ----------
+        crate_name: str
+            The name of the crate to plot.
+
+        Returns
+        -------
+        None.
+        """
+        figure = plt.figure(figsize=(8,6))
+        ax = figure.add_subplot()
+        selected = self.median_noise_data.loc[self.median_noise_data['flange'] == crate_name]
+        x = 64*selected['board'] + selected['ch']
+        ax.scatter(x, selected['rawrms'])
+        ax.set_xlim(0,576)
+        ax.set_ylim(0, 10.0)
+        ax.set_xticks([64*i for i in range(10)])
+        ax.set_xlabel('Channel Number')
+        ax.set_ylabel('RMS [ADC]')
+        figure.suptitle(crate_name)
+
+    def _get_noise(self, input_df, signal_threshold=[40,25,25]) -> None:
+        """
+        Loads the noise data from the input dataframe while performing
+        averaging per channel and basic signal rejection using a range-
+        based (max - min of waveform) threshold.
+
+        Parameters
+        ----------
+        input_df: pandas.DataFrame
+            The input noise data in a Pandas DataFrame.
+        signal_threshold: list(float)
+            Per-plane thresholds on the range to be used for basic
+            signal rejection.
+        
+        Returns
+        -------
+        None.
+        """
+        data = input_df.astype({'run': int, 'event': int, 'time': int,
+                                'ch': int,'frag': int, 'board': int,
+                                'slot_id': int})
+        data = data.rename(columns={'frag': 'fragment', 'rms': 'rawrms', 'ped': 'pedestal'})
+        columns = list(data.columns)
+        data = data.merge(self.chmap,
+                          left_on=['fragment', 'board', 'ch'],
+                          right_on=['fragment', 'readout_board_slot', 'channel_number'])
+        data = data[columns + ['channel_id', 'flange']]
+        flange_map = dict(zip(data['fragment'], data['flange']))
+        data['plane'] = np.digitize(data['channel_id'] % 13824, [2304, 8064, 13824])
+        mask = data['range'] < np.array([signal_threshold[x] for x in data['plane']])
+        self.noise_data = data.loc[mask]
+        self.median_noise_data = data.loc[mask].groupby('channel_id').median().reset_index()
+        self.median_noise_data['flange'] = [flange_map[x] for x in self.median_noise_data['fragment']]
         
     def _get_correlation_matrix(self, crate=0) -> np.array:
         """
@@ -103,5 +163,7 @@ class Dataset:
         figure.colorbar(im, ax=ax)
         ax.set_xticks([64*i for i in range(10)])
         ax.set_yticks([64*i for i in range(10)])
+        ax.set_xlabel('Channel Number')
+        ax.set_ylabel('Channel Number')
         figure.suptitle(title)
 
