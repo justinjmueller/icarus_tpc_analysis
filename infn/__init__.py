@@ -1,1 +1,1 @@
-from .infn_reader import INFNEvent, INFNDataset
+from .infn import INFNEvent, INFNDataset
