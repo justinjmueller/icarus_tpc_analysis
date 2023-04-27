@@ -21,6 +21,7 @@ class Dataset:
         plt.style.use('plot_style.mplstyle')
         data = uproot.open(f'{path}/run{run}.root')
         self.correlations = data['tpcnoiseartdaq/tpccorrelation'].arrays(library='pd')
+        self.noise = data['tpcnoiseartdaq/tpcnoise'].arrays(library='pd')
         self.indexer = {int(i*(i+1)/2) + j: (i, j) for i in range(576) for j in range(i+1)}
         
     def _get_correlation_matrix(self, crate=0) -> np.array:
