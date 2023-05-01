@@ -69,6 +69,7 @@ class Dataset:
         data = data[columns + ['channel_id', 'flange']]
         flange_map = dict(zip(data['fragment'], data['flange']))
         data['plane'] = np.digitize(data['channel_id'] % 13824, [2304, 8064, 13824])
+        data['tpc'] = data['channel_id'].to_numpy() // 13824
         mask = data['range'] < np.array([signal_threshold[x] for x in data['plane']])
         self.noise_data = data.loc[mask]
         self.median_noise_data = data.loc[mask].groupby('channel_id').median().reset_index()
