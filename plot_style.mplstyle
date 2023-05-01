@@ -34,6 +34,7 @@ patch.antialiased: True
 # Legend
 legend.fontsize: 16
 legend.frameon: True
+legend.markerscale: 2.0
 
 # Font
 font.family: sans-serif
