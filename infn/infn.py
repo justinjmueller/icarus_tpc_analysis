@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import struct
 from glob import glob
 import matplotlib.pyplot as plt
@@ -23,6 +24,42 @@ class INFNDataset:
             inputs = inputs[:nevts]
         self.events = [INFNEvent(x) for x in inputs]
         self.covariance = np.mean([x.cov for x in self.events], axis=0)
+        self._get_noise()
+    
+    def _get_noise(self) -> None:
+        """
+        Loads the noise data from the list of INFN events and calculates
+        the median over the number of events.
+
+        Parameters
+        ----------
+        None.
+        
+        Returns
+        -------
+        None.
+        """
+        data = {'flange': np.repeat('INFN', self.events[0].rms.shape[0]),
+                'board': np.array([int(x/64) for x in range(len(self.events[0].rms))]),
+                'ch': np.array([x%64 for x in range(len(self.events[0].rms))]),
+                'pedestal': np.median(np.vstack([x.pedestals for x in self.events]), axis=0),
+                'rawrms': np.median(np.vstack([x.rms for x in self.events]), axis=0)}
+        self.median_noise_data = pd.DataFrame(data)
+    
+    def __getitem__(self, key) -> np.array:
+        """
+        Provides key-value access to the noise metrics.
+
+        Parameters
+        ----------
+        key: str
+            The name of the metric to return.
+
+        Returns
+        -------
+        The metric corresponding to the key as a numpy array.
+        """
+        return self.median_noise_data[key].to_numpy()
 
     def plot_correlation_matrix(self) -> None:
         """
