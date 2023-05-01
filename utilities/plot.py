@@ -15,8 +15,8 @@ def plot_crate(datasets, labels, metric='rawrms', component='WW19') -> None:
         The labels for each Dataset's entry in the legend.
     metric: str
         The key in the Dataset that specifies the metric.
-    component: str
-        The name of the component to selet and plot.
+    component: str or list[str]
+        The name of the component(s) to select and plot.
 
     Returns
     -------
@@ -25,7 +25,13 @@ def plot_crate(datasets, labels, metric='rawrms', component='WW19') -> None:
     figure = plt.figure(figsize=(8,6))
     ax = figure.add_subplot()
     for di, d in enumerate(datasets):
-        selected = d['flange'] == component
+        if isinstance(component, list) and len(component) == len(datasets):
+            c = component[di]
+            title = ' vs. '.join(component)
+        else:
+            c = component
+            title = component
+        selected = d['flange'] == c
         x = 64*d['board'][selected] + d['ch'][selected]
         ax.scatter(x, d['rawrms'][selected], label=labels[di])
     ax.set_xlim(0,576)
@@ -34,4 +40,4 @@ def plot_crate(datasets, labels, metric='rawrms', component='WW19') -> None:
     ax.set_xlabel('Channel Number')
     ax.set_ylabel('RMS [ADC]')
     ax.legend()
-    figure.suptitle(component)
+    figure.suptitle(title)
