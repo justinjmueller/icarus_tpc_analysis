@@ -24,6 +24,21 @@ class Dataset:
         self.correlations = data['tpcnoiseartdaq/tpccorrelation'].arrays(library='pd')
         self._get_noise(data['tpcnoiseartdaq/tpcnoise'].arrays(library='pd'))
         self.indexer = {int(i*(i+1)/2) + j: (i, j) for i in range(576) for j in range(i+1)}
+    
+    def __getitem__(self, key) -> np.array:
+        """
+        Provides key-value access to the median noise DataFrame.
+
+        Parameters
+        ----------
+        key: str
+            The name of the column to return.
+
+        Returns
+        -------
+        The column corresponding to the key as a numpy array.
+        """
+        return self.median_noise_data[key].to_numpy()
 
     def plot_crate(self, crate_name='WW19') -> None:
         """
