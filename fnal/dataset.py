@@ -3,8 +3,10 @@ import math
 import pandas as pd
 import uproot
 import matplotlib.pyplot as plt
+from numba import jit
 
 class Dataset:
+    @jit
     def __init__(self, path, run) -> None:
         """
         Parameters
@@ -25,6 +27,7 @@ class Dataset:
         self._get_noise(data['tpcnoiseartdaq/tpcnoise'].arrays(library='pd'))
         self.indexer = {int(i*(i+1)/2) + j: (i, j) for i in range(576) for j in range(i+1)}
     
+    @jit
     def __getitem__(self, key) -> np.array:
         """
         Provides key-value access to the median noise DataFrame.
@@ -40,6 +43,7 @@ class Dataset:
         """
         return self.median_noise_data[key].to_numpy()
 
+    @jit
     def plot_crate(self, crate_name='WW19') -> None:
         """
         Plot the noise per channel of a single mini-crate.
@@ -65,6 +69,7 @@ class Dataset:
         ax.set_ylabel('RMS [ADC]')
         figure.suptitle(crate_name)
 
+    @jit
     def _get_noise(self, input_df, signal_threshold=[40,25,25]) -> None:
         """
         Loads the noise data from the input dataframe while performing
@@ -98,7 +103,8 @@ class Dataset:
         self.noise_data = data.loc[mask]
         self.median_noise_data = data.loc[mask].groupby('channel_id').median().reset_index()
         self.median_noise_data['flange'] = [flange_map[x] for x in self.median_noise_data['fragment']]
-        
+
+    @jit    
     def _get_correlation_matrix(self, crate=0) -> np.array:
         """
         Loads the correlation matrix containing channel-to-channel
@@ -148,6 +154,7 @@ class Dataset:
             offset += {'T': 0, 'M': 1, 'B': 2}[crate_name.upper()[4]]
         return offset
     
+    @jit
     def plot_correlation_matrix(self, crate='WW19') -> None:
         """
         Plot the channel-to-channel correlation matrix of either a
