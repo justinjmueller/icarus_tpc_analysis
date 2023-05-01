@@ -2,10 +2,56 @@ import numpy as np
 import matplotlib.pyplot as plt
 from fnal import Dataset
 
+def plot_tpc(datasets, labels, metric='rawrms', tpc=0) -> None:
+    """
+    Plots the desired metric (channel-to-channel by wire plane) for
+    the specified TPC.
+
+    Parameters
+    ----------
+    datasets: list[Dataset]
+        The Dataset objects to be plotted against each other.
+    labels: list[str]
+        The labels for each Dataset's entry in the legend.
+    metric: str
+        The key in the Dataset that specifies the metric.
+    tpc: int or list[int]
+        The index of the tpc(s) to select and plot.
+    """
+    figure = plt.figure(figsize=(26,16))
+    gspec = figure.add_gridspec(3,8)
+    saxs = [figure.add_subplot(gspec[i,0:6]) for i in [0,1,2]]
+    haxs = [figure.add_subplot(gspec[i,6:8]) for i in [0,1,2]]
+    planes = ['Induction 1', 'Induction 2', 'Collection']
+    nchannels = [2304, 5760, 5760]
+    ndivs = [288, 576, 576]
+
+    for pi, p in enumerate(planes):
+        for di, d in enumerate(datasets):
+            mask = ((d['tpc'] == tpc) & (d['plane'] == pi))
+
+            saxs[pi].scatter(d['channel_id'][mask], d[metric][mask], label=labels[di])
+            xlow = 13824*tpc + sum(nchannels[:pi])
+            xhigh = xlow + nchannels[pi]
+            saxs[pi].set_xlim(xlow,xhigh)
+            saxs[pi].set_ylim(0,10)
+            saxs[pi].set_xticks(np.arange(xlow, xhigh+ndivs[pi], ndivs[pi]))
+            saxs[pi].set_xlabel('Channel ID')
+            saxs[pi].set_ylabel('RMS [ADC]')
+            saxs[pi].set_title(p)
+
+            haxs[pi].hist(d[metric][mask], range=(0,10), bins=50,
+                          label=labels[di], histtype='step')
+            haxs[pi].legend()
+            haxs[pi].set_xlim(0,10)
+            haxs[pi].set_xlabel('RMS [ADC]')
+            haxs[pi].set_ylabel('Entries')
+
 def plot_crate(datasets, labels, metric='rawrms', component='WW19') -> None:
     """
     Plots the desired metric (channel-to-channel for the specified
-    component) for each of the input Datasets.
+    component) for each of the input Datasets. A Dataset can also
+    be an INFNDataset.
 
     Parameters
     ----------
