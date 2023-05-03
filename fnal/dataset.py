@@ -23,6 +23,9 @@ class Dataset:
         self.chmap = pd.read_csv('channel_map.csv')
         self.correlations = data['tpcnoiseartdaq/tpccorrelation'].arrays(library='pd')
         self._get_noise(data['tpcnoiseartdaq/tpcnoise'].arrays(library='pd'))
+        self.rawffts = data['tpcnoiseartdaq/RawFFTs'].values()
+        self.intffts = data['tpcnoiseartdaq/IntFFTs'].values()
+        self.cohffts = data['tpcnoiseartdaq/CohFFTs'].values()
         self.indexer = {int(i*(i+1)/2) + j: (i, j) for i in range(576) for j in range(i+1)}
     
     def __getitem__(self, key) -> np.array:
@@ -39,6 +42,24 @@ class Dataset:
         The column corresponding to the key as a numpy array.
         """
         return self.median_noise_data[key].to_numpy()
+    
+    def get_ffts(self, group) -> np.array:
+        """
+        Retrieves the FFTs for the corresponding group
+
+        Parameters
+        ----------
+        None.
+
+        Returns
+        -------
+        ffts: np.array
+            The FFTs of the group in a numpy array with shape (3, 2049)
+            where the second axis is the frequency bins and the first
+            axis contains the raw, intrinsic, and coherent components
+            of the noise respectively.
+        """
+        return np.vstack([self.rawffts[:, group], self.intffts[:, group], self.cohffts[:, group]])
 
     def _get_noise(self, input_df, signal_threshold=[40,25,25]) -> None:
         """
