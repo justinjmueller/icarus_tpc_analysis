@@ -18,6 +18,7 @@ def plot_tpc(datasets, labels, metric='rawrms', tpc=0) -> None:
     tpc: int or list[int]
         The index of the tpc(s) to select and plot.
     """
+    plt.style.use('plot_style.mplstyle')
     figure = plt.figure(figsize=(26,16))
     gspec = figure.add_gridspec(3,8)
     saxs = [figure.add_subplot(gspec[i,0:6]) for i in [0,1,2]]
@@ -68,6 +69,7 @@ def plot_crate(datasets, labels, metric='rawrms', component='WW19') -> None:
     -------
     None.
     """
+    plt.style.use('plot_style.mplstyle')
     figure = plt.figure(figsize=(8,6))
     ax = figure.add_subplot()
     for di, d in enumerate(datasets):
@@ -86,4 +88,29 @@ def plot_crate(datasets, labels, metric='rawrms', component='WW19') -> None:
     ax.set_xlabel('Channel Number')
     ax.set_ylabel('RMS [ADC]')
     ax.legend()
+    figure.suptitle(title)
+
+def plot_waveform(waveform, title) -> None:
+    """
+    Plot a single waveform over its full range.
+
+    Parameters
+    ----------
+    waveform: np.array
+        The input waveform to plot. Assumed shape of (4096,).
+    title: str
+        The title to be displayed at the top of the plot.
+
+    Returns
+    -------
+    None.
+    """
+    plt.style.use('plot_style.mplstyle')
+    figure = plt.figure(figsize=(14,6))
+    ax = figure.add_subplot()
+    ax.plot(np.arange(4096), waveform, linestyle='-', linewidth=1)
+    ax.set_xlim(0,4096)
+    ax.set_ylim(-20, 20)
+    ax.set_xlabel('Time [ticks]')
+    ax.set_ylabel('Waveform Height [ADC]')
     figure.suptitle(title)
