@@ -1,1 +1,1 @@
-from .waveform_generator import generate_waveform
+from .waveform_generator import generate_waveform, generate_component
