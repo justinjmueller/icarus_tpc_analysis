@@ -1,5 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.collections import LineCollection
+from matplotlib import colors as colors
+from matplotlib import cm as cm
 from fnal import Dataset
 
 def plot_tpc(datasets, labels, metric='rawrms', tpc=0) -> None:
@@ -81,7 +84,7 @@ def plot_crate(datasets, labels, metric='rawrms', component='WW19') -> None:
             title = component
         selected = d['flange'] == c
         x = 64*d['board'][selected] + d['ch'][selected]
-        ax.scatter(x, d['rawrms'][selected], label=labels[di])
+        ax.scatter(x, d[metric][selected], label=labels[di])
     ax.set_xlim(0,576)
     ax.set_ylim(0, 10.0)
     ax.set_xticks([64*i for i in range(10)])
