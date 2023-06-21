@@ -106,6 +106,9 @@ def plot_tpc(datasets, labels, metric='rawrms', tpc=0) -> None:
             haxs[pi].set_xlim(0,10)
             haxs[pi].set_xlabel('RMS [ADC]')
             haxs[pi].set_ylabel('Entries')
+    if isinstance(tpc, int):
+        tpc_name = {0: 'EE', 1: 'EW', 2: 'WE', 3: 'WW'}[tpc]
+        figure.suptitle(f'{tpc_name} TPC')
 
 def plot_crate(datasets, labels, metric='rawrms', component='WW19') -> None:
     """
