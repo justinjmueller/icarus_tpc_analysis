@@ -25,11 +25,15 @@ class Dataset:
         pd.options.mode.chained_assignment = None
         data = uproot.open(f'{path}/run{run}{"_"+suf if suf is not None else ""}.root')
         self.chmap = pd.read_csv('channel_map.csv')
-        self.correlations = data['tpcnoiseartdaq/tpccorrelation'].arrays(library='pd')
-        self._get_noise(data['tpcnoiseartdaq/tpcnoise'].arrays(library='pd'))
-        self.rawffts = data['tpcnoiseartdaq/RawFFTs'].values()
-        self.intffts = data['tpcnoiseartdaq/IntFFTs'].values()
-        self.cohffts = data['tpcnoiseartdaq/CohFFTs'].values()
+        trimmed_keys = [x.split(';')[0] for x in data.keys()]
+        if 'tpcnoiseartdaq/tpccorrelation' in trimmed_keys:
+            self.correlations = data['tpcnoiseartdaq/tpccorrelation'].arrays(library='pd')
+        if 'tpcnoiseartdaq/tpcnoise' in trimmed_keys:
+            self._get_noise(data['tpcnoiseartdaq/tpcnoise'].arrays(library='pd'))
+        if 'tpcnoiseartdaq/RawFFTs' in trimmed_keys:
+            self.rawffts = data['tpcnoiseartdaq/RawFFTs'].values()
+            self.intffts = data['tpcnoiseartdaq/IntFFTs'].values()
+            self.cohffts = data['tpcnoiseartdaq/CohFFTs'].values()
         self.indexer = {int(i*(i+1)/2) + j: (i, j) for i in range(576) for j in range(i+1)}
     
     def __getitem__(self, key) -> np.array:
