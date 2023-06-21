@@ -3,6 +3,7 @@ import math
 import pandas as pd
 import uproot
 import matplotlib.pyplot as plt
+import warnings
 
 class Dataset:
     def __init__(self, path, run) -> None:
@@ -19,6 +20,7 @@ class Dataset:
         None.
         """
         plt.style.use('plot_style.mplstyle')
+        pd.options.mode.chained_assignment = None
         data = uproot.open(f'{path}/run{run}.root')
         self.chmap = pd.read_csv('channel_map.csv')
         self.correlations = data['tpcnoiseartdaq/tpccorrelation'].arrays(library='pd')
@@ -41,7 +43,10 @@ class Dataset:
         -------
         The column corresponding to the key as a numpy array.
         """
-        return self.median_noise_data[key].to_numpy()
+        if key in self.median_noise_data.columns:
+            return self.median_noise_data[key].to_numpy()
+        else:
+            return self.noise_data[key].to_numpy()
     
     def get_ffts(self, group) -> np.array:
         """
@@ -95,6 +100,18 @@ class Dataset:
         self.noise_data = data.loc[mask]
         self.median_noise_data = data.loc[mask].groupby('channel_id').median().reset_index()
         self.median_noise_data['flange'] = [flange_map[x] for x in self.median_noise_data['fragment']]
+        group_e2e = self.noise_data.groupby('channel_id')
+        group_c2c = self.noise_data.groupby(['fragment', 'board'])
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            warnings.warn("runtime", RuntimeWarning)
+            for k in ['rawrms', 'intrms', 'cohrms', 'pedestal']:
+                median_e2e = group_e2e[k].transform('median').to_numpy()
+                median_c2c = group_c2c[k].transform('median').to_numpy()
+                self.noise_data[f'{k}_e2eabs'] = (self.noise_data[k].to_numpy() - median_e2e)
+                self.noise_data[f'{k}_c2cabs'] = (self.noise_data[k].to_numpy() - median_c2c)
+                self.noise_data[f'{k}_e2erel'] = (self.noise_data[k].to_numpy() - median_e2e) / median_e2e
+                self.noise_data[f'{k}_c2crel'] = (self.noise_data[k].to_numpy() - median_c2c) / median_c2c
 
     def _get_correlation_matrix(self, crate=0) -> np.array:
         """

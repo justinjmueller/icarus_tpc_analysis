@@ -6,6 +6,58 @@ from matplotlib import colors as colors
 from matplotlib import cm as cm
 from fnal import Dataset
 
+def plot_planes(dataset, metric, mtype='e2e', tpc=None) -> None:
+    """
+    Plots the desired metric (channel-to-channel by wire plane) for
+    the specified TPC as a set of 1D histograms.
+
+    Parameters
+    ----------
+    dataset: Dataset
+        The Dataset object to be plotted.
+    metric: str
+        The key in the Dataset that specifies the metric.
+    mtype: str or list[str]
+        The sub-type(s) of the metric (e2e, c2c).
+    tpc: int
+        The index of the tpc to select and plot.
+
+    Returns
+    -------
+    None.
+    """
+    plt.style.use('plot_style.mplstyle')
+    figure = plt.figure(figsize=(14,6))
+    gspec = figure.add_gridspec(16,3)
+    haxs = [figure.add_subplot(gspec[2:13, p]) for p in [0,1,2]]
+    planes = ['Induction 1', 'Induction 2', 'Collection']
+    if isinstance(mtype, str):
+        mtype = [mtype,]
+    xaxis = 'Difference [ADC]' if 'abs' in mtype[0] else 'Relative Difference'
+    scale = 1.25 if 'abs' in mtype[0] else 0.25
+    for pi, p in enumerate(planes):
+        for m in mtype:
+            if tpc != None:
+                mask = ((dataset.noise_data['tpc'] == tpc) & (dataset.noise_data['plane'] == pi))
+            else:
+                mask = (dataset.noise_data['plane'] == pi)
+            label = {'e2e': 'Event-to-Event', 'c2c': 'Channel-to-Channel'}[m[:3]]
+            haxs[pi].hist(dataset[f'{metric}_{m}'][mask], range=(-scale,scale), bins=50,
+                          histtype='step', density=True, label=label)
+        haxs[pi].set_xlim(-scale,scale)
+        haxs[pi].set_xlabel(xaxis)
+        haxs[pi].set_ylabel('Entries (Arb.)')
+        haxs[pi].set_title(p)
+    if tpc != None:
+        tpc_name = {0: 'EE', 1: 'EW', 2: 'WE', 3: 'WW'}[tpc]
+    else:
+        tpc_name = 'All TPCs'
+    diff = {'e2e': 'Event-to-Event', 'c2c': 'Channel-to-Channel'}[mtype[0][:3]]
+    figure.suptitle(f'{diff} Difference in RMS: {tpc_name}')
+    h, l = plt.gca().get_legend_handles_labels()
+    bl = dict(zip(l,h))
+    figure.legend(bl.values(), bl.keys())
+
 def plot_tpc(datasets, labels, metric='rawrms', tpc=0) -> None:
     """
     Plots the desired metric (channel-to-channel by wire plane) for
@@ -21,6 +73,10 @@ def plot_tpc(datasets, labels, metric='rawrms', tpc=0) -> None:
         The key in the Dataset that specifies the metric.
     tpc: int or list[int]
         The index of the tpc(s) to select and plot.
+
+    Returns
+    -------
+    None.
     """
     plt.style.use('plot_style.mplstyle')
     figure = plt.figure(figsize=(26,16))
@@ -34,7 +90,6 @@ def plot_tpc(datasets, labels, metric='rawrms', tpc=0) -> None:
     for pi, p in enumerate(planes):
         for di, d in enumerate(datasets):
             mask = ((d['tpc'] == tpc) & (d['plane'] == pi))
-
             saxs[pi].scatter(d['channel_id'][mask], d[metric][mask], label=labels[di])
             xlow = 13824*tpc + sum(nchannels[:pi])
             xhigh = xlow + nchannels[pi]
