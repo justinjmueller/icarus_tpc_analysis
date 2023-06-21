@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import warnings
 
 class Dataset:
-    def __init__(self, path, run) -> None:
+    def __init__(self, path, run, suf=None) -> None:
         """
         Parameters
         ----------
@@ -14,6 +14,8 @@ class Dataset:
             Path to input data file.
         run: int
             Run number for the data to load.
+        suf: str
+            If supplied, appends a suffix to the file name (e.g. suf='before' -> runXXXX_before.root)
 
         Returns
         -------
@@ -21,7 +23,7 @@ class Dataset:
         """
         plt.style.use('plot_style.mplstyle')
         pd.options.mode.chained_assignment = None
-        data = uproot.open(f'{path}/run{run}.root')
+        data = uproot.open(f'{path}/run{run}{"_"+suf if suf is not None else ""}.root')
         self.chmap = pd.read_csv('channel_map.csv')
         self.correlations = data['tpcnoiseartdaq/tpccorrelation'].arrays(library='pd')
         self._get_noise(data['tpcnoiseartdaq/tpcnoise'].arrays(library='pd'))
