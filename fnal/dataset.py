@@ -60,7 +60,8 @@ class Dataset:
 
         Parameters
         ----------
-        None.
+        group: int.
+            The group number.
 
         Returns
         -------
