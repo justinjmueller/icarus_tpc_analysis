@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import warnings
 
 class Dataset:
-    def __init__(self, path, run, suf=None) -> None:
+    def __init__(self, path, run, suf=None, toy=False) -> None:
         """
         Parameters
         ----------
@@ -16,6 +16,8 @@ class Dataset:
             Run number for the data to load.
         suf: str
             If supplied, appends a suffix to the file name (e.g. suf='before' -> runXXXX_before.root)
+        toy: bool
+            Marks the dataset as a toy dataset.
 
         Returns
         -------
@@ -26,14 +28,15 @@ class Dataset:
         data = uproot.open(f'{path}/run{run}{"_"+suf if suf is not None else ""}.root')
         self.chmap = pd.read_csv('channel_map.csv')
         trimmed_keys = [x.split(';')[0] for x in data.keys()]
-        if 'tpcnoiseartdaq/tpccorrelation' in trimmed_keys:
-            self.correlations = data['tpcnoiseartdaq/tpccorrelation'].arrays(library='pd')
-        if 'tpcnoiseartdaq/tpcnoise' in trimmed_keys:
-            self._get_noise(data['tpcnoiseartdaq/tpcnoise'].arrays(library='pd'))
-        if 'tpcnoiseartdaq/RawFFTs' in trimmed_keys:
-            self.rawffts = data['tpcnoiseartdaq/RawFFTs'].values()
-            self.intffts = data['tpcnoiseartdaq/IntFFTs'].values()
-            self.cohffts = data['tpcnoiseartdaq/CohFFTs'].values()
+        key_base = '' if toy else 'tpcnoiseartdaq/'
+        if key_base+'tpccorrelation' in trimmed_keys:
+            self.correlations = data[key_base+'tpccorrelation'].arrays(library='pd')
+        if key_base+'tpcnoise' in trimmed_keys:
+            self._get_noise(data[key_base+'tpcnoise'].arrays(library='pd'))
+        if key_base+'RawFFTs' in trimmed_keys:
+            self.rawffts = data[key_base+'RawFFTs'].values()
+            self.intffts = data[key_base+'IntFFTs'].values()
+            self.cohffts = data[key_base+'CohFFTs'].values()
         self.indexer = {int(i*(i+1)/2) + j: (i, j) for i in range(576) for j in range(i+1)}
     
     def __getitem__(self, key) -> np.array:
