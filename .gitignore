@@ -8,6 +8,7 @@
 
 # Other things
 *.pyc
+*.root
 
 # Compiled Object files
 *.slo
