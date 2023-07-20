@@ -81,5 +81,6 @@ def generate_component(data, component) -> np.array:
     
     channel_to_group = {x[0]: np.argwhere(groups == x[3]) for x in channels}
     cphase = np.random.uniform(0, 2*np.pi, 2049*nboards).reshape((nboards,2049))
+    all_ffts = [data.get_ffts(data.chmap.query(f'channel_id == {x[0]}').iloc[0]['group']) for x in channels]
     waveforms = np.vstack([generate_waveform(data, x[0], cphase[:,channel_to_group[x[0]]]) for x in channels])
-    return waveforms
+    return waveforms, all_ffts
