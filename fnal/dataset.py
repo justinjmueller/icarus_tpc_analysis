@@ -28,15 +28,17 @@ class Dataset:
         data = uproot.open(f'{path}/run{run}{"_"+suf if suf is not None else ""}.root')
         self.chmap = pd.read_csv('channel_map.csv')
         trimmed_keys = [x.split(';')[0] for x in data.keys()]
-        key_base = '' if toy else 'tpcnoiseartdaq/'
+        key_base = '' if toy else 'tpcnoisefull/'
         if key_base+'tpccorrelation' in trimmed_keys:
             self.correlations = data[key_base+'tpccorrelation'].arrays(library='pd')
         if key_base+'tpcnoise' in trimmed_keys:
             self._get_noise(data[key_base+'tpcnoise'].arrays(library='pd'))
-        if key_base+'RawFFTs' in trimmed_keys:
-            self.rawffts = data[key_base+'RawFFTs'].values()
-            self.intffts = data[key_base+'IntFFTs'].values()
-            self.cohffts = data[key_base+'CohFFTs'].values()
+        if key_base+'raw_ffts' in trimmed_keys:
+            self.rawffts = data[key_base+'raw_ffts'].values()
+            self.intffts = data[key_base+'int_ffts'].values()
+            self.cohffts = data[key_base+'coh_ffts'].values()
+            for v in [self.rawffts, self.intffts, self.cohffts]:
+                v = v[:2049,:] / v[-1, :]
         self.indexer = {int(i*(i+1)/2) + j: (i, j) for i in range(576) for j in range(i+1)}
     
     def __getitem__(self, key) -> np.array:
@@ -76,7 +78,7 @@ class Dataset:
         """
         return np.vstack([self.rawffts[:, group], self.intffts[:, group], self.cohffts[:, group]])
 
-    def _get_noise(self, input_df, signal_threshold=[40,25,25]) -> None:
+    def _get_noise(self, input_df) -> None:
         """
         Loads the noise data from the input dataframe while performing
         averaging per channel and basic signal rejection using a range-
@@ -86,36 +88,26 @@ class Dataset:
         ----------
         input_df: pandas.DataFrame
             The input noise data in a Pandas DataFrame.
-        signal_threshold: list(float)
-            Per-plane thresholds on the range to be used for basic
-            signal rejection.
         
         Returns
         -------
         None.
         """
-        data = input_df.astype({'run': int, 'event': int, 'time': int,
-                                'ch': int,'frag': int, 'board': int,
-                                'slot_id': int})
-        data = data.rename(columns={'frag': 'fragment', 'rms': 'rawrms', 'ped': 'pedestal'})
-        columns = list(data.columns)
-        data = data.merge(self.chmap,
-                          left_on=['fragment', 'board', 'ch'],
-                          right_on=['fragment', 'readout_board_slot', 'channel_number'])
-        data = data[columns + ['channel_id', 'flange']]
+        columns = list(input_df.columns)
+        data = input_df.merge(self.chmap[['channel_id', 'flange']], left_on='channel_id', right_on='channel_id')
         flange_map = dict(zip(data['fragment'], data['flange']))
         data['plane'] = np.digitize(data['channel_id'] % 13824, [2304, 8064, 13824])
         data['tpc'] = data['channel_id'].to_numpy() // 13824
-        mask = data['range'] < np.array([signal_threshold[x] for x in data['plane']])
+        mask = (data['hits'] == 0)
         self.noise_data = data.loc[mask]
         self.median_noise_data = data.loc[mask].groupby('channel_id').median().reset_index()
         self.median_noise_data['flange'] = [flange_map[x] for x in self.median_noise_data['fragment']]
         group_e2e = self.noise_data.groupby('channel_id')
-        group_c2c = self.noise_data.groupby(['fragment', 'board'])
+        group_c2c = self.noise_data.groupby(['fragment', 'slot_id'])
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             warnings.warn("runtime", RuntimeWarning)
-            for k in ['rawrms', 'intrms', 'cohrms', 'pedestal']:
+            for k in ['raw_rms', 'int_rms', 'coh_rms', 'pedestal']:
                 median_e2e = group_e2e[k].transform('median').to_numpy()
                 median_c2c = group_c2c[k].transform('median').to_numpy()
                 self.noise_data[f'{k}_e2eabs'] = (self.noise_data[k].to_numpy() - median_e2e)
@@ -140,7 +132,7 @@ class Dataset:
         """
         size = int(576 * 577 / 2)
         cov = np.zeros((576,576))
-        sel = self.correlations['rho'].to_numpy()[crate*size:(crate+1)*size]
+        sel = (self.correlations['rho'] / self.correlations['count']).to_numpy()[crate*size:(crate+1)*size]
         for si, s in enumerate(sel):
             i, j = self.indexer[si]
             if math.isnan(s):
