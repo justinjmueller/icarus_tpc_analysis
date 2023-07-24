@@ -40,10 +40,10 @@ class INFNDataset:
         None.
         """
         data = {'flange': np.repeat('INFN', self.events[0].rms.shape[0]),
-                'board': np.array([int(x/64) for x in range(len(self.events[0].rms))]),
-                'ch': np.array([x%64 for x in range(len(self.events[0].rms))]),
+                'slot_id': np.array([int(x/64) for x in range(len(self.events[0].rms))]),
+                'local_id': np.array([x%64 for x in range(len(self.events[0].rms))]),
                 'pedestal': np.median(np.vstack([x.pedestals for x in self.events]), axis=0),
-                'rawrms': np.median(np.vstack([x.rms for x in self.events]), axis=0)}
+                'raw_rms': np.median(np.vstack([x.rms for x in self.events]), axis=0)}
         self.median_noise_data = pd.DataFrame(data)
     
     def __getitem__(self, key) -> np.array:
