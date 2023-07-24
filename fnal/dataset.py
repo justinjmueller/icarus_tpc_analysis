@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import warnings
 
 class Dataset:
-    def __init__(self, path, run, suf=None, toy=False) -> None:
+    def __init__(self, path, run, suf=None, mc=False, toy=False) -> None:
         """
         Parameters
         ----------
@@ -16,6 +16,8 @@ class Dataset:
             Run number for the data to load.
         suf: str
             If supplied, appends a suffix to the file name (e.g. suf='before' -> runXXXX_before.root)
+        mc: bool
+            Marks the dataset as a Monte Carlo dataset.
         toy: bool
             Marks the dataset as a toy dataset.
 
@@ -25,20 +27,22 @@ class Dataset:
         """
         plt.style.use('plot_style.mplstyle')
         pd.options.mode.chained_assignment = None
-        data = uproot.open(f'{path}/run{run}{"_"+suf if suf is not None else ""}.root')
+        data = uproot.open(f'{path}/{"mc" if mc else "run"}{run}{"_"+suf if suf is not None else ""}.root')
         self.chmap = pd.read_csv('channel_map.csv')
         trimmed_keys = [x.split(';')[0] for x in data.keys()]
-        key_base = '' if toy else 'tpcnoisefull/'
-        if key_base+'tpccorrelation' in trimmed_keys:
-            self.correlations = data[key_base+'tpccorrelation'].arrays(library='pd')
-        if key_base+'tpcnoise' in trimmed_keys:
-            self._get_noise(data[key_base+'tpcnoise'].arrays(library='pd'))
-        if key_base+'raw_ffts' in trimmed_keys:
-            self.rawffts = data[key_base+'raw_ffts'].values()
-            self.intffts = data[key_base+'int_ffts'].values()
-            self.cohffts = data[key_base+'coh_ffts'].values()
-            for v in [self.rawffts, self.intffts, self.cohffts]:
-                v = v[:2049,:] / v[-1, :]
+        if 'tpccorrelation' in trimmed_keys:
+            self.correlations = data['tpccorrelation'].arrays(library='pd')
+        if 'tpcnoise' in trimmed_keys:
+            self._get_noise(data['tpcnoise'].arrays(library='pd'))
+        if 'raw_ffts' in trimmed_keys:
+            self.rawffts = data['raw_ffts'].values()
+            self.intffts = data['int_ffts'].values()
+            self.cohffts = data['coh_ffts'].values()
+            norm = self.rawffts[-1,:]
+            norm[norm == 0] = 1.0
+            self.rawffts = self.rawffts[:2049] / norm
+            self.intffts = self.intffts[:2049] / norm
+            self.cohffts = self.cohffts[:2049] / norm
         self.indexer = {int(i*(i+1)/2) + j: (i, j) for i in range(576) for j in range(i+1)}
     
     def __getitem__(self, key) -> np.array:
@@ -65,7 +69,7 @@ class Dataset:
 
         Parameters
         ----------
-        group: int.
+        group: int
             The group number.
 
         Returns
@@ -77,6 +81,27 @@ class Dataset:
             of the noise respectively.
         """
         return np.vstack([self.rawffts[:, group], self.intffts[:, group], self.cohffts[:, group]])
+    
+    def get_ffts_plane(self, plane=0) -> np.array:
+        """
+        Retrieves the average FFTs for the requested plane.
+
+        Parameters
+        ----------
+        plane: int
+            The plane number.
+
+        Returns
+        -------
+        ffts: np.array
+            The average FFTs of all groups in the requested plane. This
+            has shape (3, 2049) where the second axis is the frequency
+            bins and the first axis contains the raw, intrinsic, and
+            coherent components of the noise respectively.
+        """
+        groups = np.arange(1728)[np.digitize(np.arange(1728) % 432, [72, 252, 432]) == plane]
+        all_ffts = np.dstack([self.get_ffts(x) for x in groups])
+        return np.mean(all_ffts, axis=-1)
 
     def _get_noise(self, input_df) -> None:
         """
@@ -98,7 +123,7 @@ class Dataset:
         flange_map = dict(zip(data['fragment'], data['flange']))
         data['plane'] = np.digitize(data['channel_id'] % 13824, [2304, 8064, 13824])
         data['tpc'] = data['channel_id'].to_numpy() // 13824
-        mask = (data['hits'] == 0)
+        mask = (data['hits'] <= 3)
         self.noise_data = data.loc[mask]
         self.median_noise_data = data.loc[mask].groupby('channel_id').median().reset_index()
         self.median_noise_data['flange'] = [flange_map[x] for x in self.median_noise_data['fragment']]
