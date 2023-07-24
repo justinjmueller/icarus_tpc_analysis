@@ -6,6 +6,48 @@ from matplotlib import colors as colors
 from matplotlib import cm as cm
 from fnal import Dataset
 
+def plot_ffts(datasets, labels, fft_type='raw', tpc=None) -> None:
+    """
+    Plots the desired FFTs for the specifed TPC as a set of 1D scatterplots.
+
+    Parameters
+    ----------
+    datasets: list(Dataset)
+        The Datasets to be plotted.
+    labels: list(str)
+        The labels for each Dataset.
+    fft_type: str
+        The type of noise FFT to plot. Options: 'raw', 'int', 'coh'
+    tpc: int
+        The index of the TPC to select and plot.
+
+    Returns
+    -------
+    None.
+    """
+    plt.style.use('plot_style.mplstyle')
+    figure = plt.figure(figsize=(9,7.5))
+    planes = ['Induction 1', 'Induction 2', 'Collection']
+    frequency = 0.610351563*np.arange(2049)    
+    gspec = figure.add_gridspec(22,22)
+    axs = [figure.add_subplot(gspec[7*p:7*(p+1),1:22]) for p in [0,1,2]]
+    fft_type = {'raw': 0, 'int': 1, 'coh': 2}[fft_type]
+    fft_label = ['Raw', 'Intrinsic', 'Coherent'][fft_type]
+    for p in [0,1,2]:
+        for di, d in enumerate(datasets):
+            fft = d.get_ffts_plane(p)[fft_type, :]
+            mask = ~np.isnan(fft)
+            axs[p].scatter(frequency[mask], fft[mask]/1000, s=3, label=labels[di])
+            axs[p].set_title(planes[p])
+            if p < 2: axs[p].tick_params('x', labelbottom=False)
+            if p == 0: axs[p].legend(markerscale=4)
+            axs[p].set_xlim(0, 500)
+            axs[p].set_ylim(0, 1.2)
+            axs[p].set_yticks(0.3*np.arange(5))
+        
+    figure.text(0.55, 0.01, 'Frequency [kHz]', ha='center', fontsize=18)
+    figure.text(0.01, 0.5, 'Power [$\mathrm{ADC^2}$/kHz]', va='center', rotation='vertical', fontsize=18)
+
 def plot_planes(dataset, metric, mtype='e2e', tpc=None) -> None:
     """
     Plots the desired metric (channel-to-channel by wire plane) for
@@ -20,7 +62,7 @@ def plot_planes(dataset, metric, mtype='e2e', tpc=None) -> None:
     mtype: str or list[str]
         The sub-type(s) of the metric (e2e, c2c).
     tpc: int
-        The index of the tpc to select and plot.
+        The index of the TPC to select and plot.
 
     Returns
     -------
@@ -58,7 +100,7 @@ def plot_planes(dataset, metric, mtype='e2e', tpc=None) -> None:
     bl = dict(zip(l,h))
     figure.legend(bl.values(), bl.keys())
 
-def plot_tpc(datasets, labels, metric='rawrms', tpc=0) -> None:
+def plot_tpc(datasets, labels, metric='raw_rms', tpc=0) -> None:
     """
     Plots the desired metric (channel-to-channel by wire plane) for
     the specified TPC.
@@ -110,7 +152,7 @@ def plot_tpc(datasets, labels, metric='rawrms', tpc=0) -> None:
         tpc_name = {0: 'EE', 1: 'EW', 2: 'WE', 3: 'WW'}[tpc]
         figure.suptitle(f'{tpc_name} TPC')
 
-def plot_crate(datasets, labels, metric='rawrms', component='WW19') -> None:
+def plot_crate(datasets, labels, metric='raw_rms', component='WW19') -> None:
     """
     Plots the desired metric (channel-to-channel for the specified
     component) for each of the input Datasets. A Dataset can also
@@ -142,7 +184,7 @@ def plot_crate(datasets, labels, metric='rawrms', component='WW19') -> None:
             c = component
             title = component
         selected = d['flange'] == c
-        x = 64*d['board'][selected] + d['ch'][selected]
+        x = 64*d['slot_id'][selected] + d['local_id'][selected]
         ax.scatter(x, d[metric][selected], label=labels[di])
     ax.set_xlim(0,576)
     ax.set_ylim(0, 10.0)
