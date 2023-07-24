@@ -26,7 +26,7 @@ def generate_waveform(data, channel_id, cphase=None) -> np.array:
         The resulting waveform with shape = (4096,) and dtype = int.
     """
     
-    group = data.chmap.query(f'channel_id == {channel_id}').iloc[0]['group']
+    group = data.chmap.query(f'channel_id == {channel_id}').iloc[0]['group_id']
     ffts = data.get_ffts(group)
 
     # Time and frequency
