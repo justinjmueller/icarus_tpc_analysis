@@ -127,6 +127,7 @@ class Dataset:
         self.noise_data = data.loc[mask]
         self.median_noise_data = data.loc[mask].groupby('channel_id').median().reset_index()
         self.median_noise_data['flange'] = [flange_map[x] for x in self.median_noise_data['fragment']]
+        self.median_noise_data['hit_occupancy'] = data.groupby('channel_id').mean()['hits']
         group_e2e = self.noise_data.groupby('channel_id')
         group_c2c = self.noise_data.groupby(['fragment', 'slot_id'])
         with warnings.catch_warnings():
