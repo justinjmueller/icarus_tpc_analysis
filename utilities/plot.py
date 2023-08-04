@@ -48,6 +48,59 @@ def plot_ffts(datasets, labels, fft_type='raw', tpc=None) -> None:
     figure.text(0.55, 0.01, 'Frequency [kHz]', ha='center', fontsize=18)
     figure.text(0.01, 0.5, 'Power [$\mathrm{ADC^2}$/kHz]', va='center', rotation='vertical', fontsize=18)
 
+def plot_planes_new(datasets, labels, metrics, title, tpc=None, normalize=False) -> None:
+    """
+    Plots the desired metric(s) for the specified TPC and dataset(s)
+    as a set of three 1D histograms.
+
+    Parameters
+    ----------
+    datasets: list[Dataset]
+        The Dataset objects to be plotted.
+    labels: str
+        The key in the Dataset that specifies the metric.
+    metrics: list[str]
+        The metrics to be plotted.
+    title: str
+        The title of the plot.
+    tpc: list[int]
+        The TPC(s) to be plotted.
+    normalize: bool
+        Toggles the normalization of each histogram.
+    
+    Returns
+    -------
+    None.
+    """
+    plt.style.use('plot_style.mplstyle')
+    if isinstance(datasets, list):
+        datasets = [(d, metrics, tpc) for d in datasets]
+    elif isinstance(metrics, list):
+        datasets = [(datasets, m, tpc) for m in metrics]
+    elif isinstance(tpc, list):
+        datasets = [(datasets, metrics, t) for t in tpc]
+    else:
+        print('Misconfigured parameters for plot_planes.')
+    
+    figure = plt.figure(figsize=(14,6))
+    gspec = figure.add_gridspec(16,3)
+    haxs = [figure.add_subplot(gspec[2:13, p]) for p in [0,1,2]]
+    planes = ['Induction 1', 'Induction 2', 'Collection']
+    for pi, p in enumerate(planes):
+        for di, d in enumerate(datasets):
+            mask = d[0].get_mask(d[1], tpc=d[2], plane=pi)
+            style = d[0].get_styling(d[1])
+            haxs[pi].hist(d[0][d[1]][mask], range=style[1], bins=style[2],
+                          histtype='step', label=labels[di], density=normalize)
+        haxs[pi].set_xlim(style[1])
+        haxs[pi].set_xlabel(style[0])
+        haxs[pi].set_ylabel('Entries (Arb.)')
+        haxs[pi].set_title(p)
+    h, l = plt.gca().get_legend_handles_labels()
+    bl = dict(zip(l,h))
+    figure.suptitle(title)
+    figure.legend(bl.values(), bl.keys())
+
 def plot_planes(dataset, metric, mtype='e2e', tpc=None) -> None:
     """
     Plots the desired metric (channel-to-channel by wire plane) for
@@ -152,7 +205,7 @@ def plot_tpc(datasets, labels, metric='raw_rms', tpc=0) -> None:
         tpc_name = {0: 'EE', 1: 'EW', 2: 'WE', 3: 'WW'}[tpc]
         figure.suptitle(f'{tpc_name} TPC')
 
-def plot_crate(datasets, labels, metric='raw_rms', component='WW19') -> None:
+def plot_crate(datasets, labels, metric='raw_rms', component='WW19', label_mean=False) -> None:
     """
     Plots the desired metric (channel-to-channel for the specified
     component) for each of the input Datasets. A Dataset can also
@@ -168,6 +221,9 @@ def plot_crate(datasets, labels, metric='raw_rms', component='WW19') -> None:
         The key in the Dataset that specifies the metric.
     component: str or list[str]
         The name of the component(s) to select and plot.
+    label_mean: bool
+        Toggles the display of the arithmetic mean in the legend
+        label for each dataset/metric.
 
     Returns
     -------
@@ -184,8 +240,10 @@ def plot_crate(datasets, labels, metric='raw_rms', component='WW19') -> None:
             c = component
             title = component
         selected = d['flange'] == c
+        mean = np.mean(d[metric][selected])
         x = 64*d['slot_id'][selected] + d['local_id'][selected]
-        ax.scatter(x, d[metric][selected], label=labels[di])
+        label_annotated = f'{labels[di]} ($\mu$: {mean:.2f})' if label_mean else labels[di]
+        ax.scatter(x, d[metric][selected], label=label_annotated)
     ax.set_xlim(0,576)
     ax.set_ylim(0, 10.0)
     ax.set_xticks([64*i for i in range(10)])
