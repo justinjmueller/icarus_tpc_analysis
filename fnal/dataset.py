@@ -62,6 +62,63 @@ class Dataset:
             return self.median_noise_data[key].to_numpy()
         else:
             return self.noise_data[key].to_numpy()
+        
+    def get_mask(self, metric='raw_rms', tpc=None, plane=None) -> np.array:
+        """
+        Creates a mask for the designated tpc/plane using the shape
+        of the provided metric.
+
+        Parameters
+        ----------
+        metric: str
+            The name of the metric to use for creating the mask.
+        tpc: int
+            The number of the TPC to select in the mask.
+        plane: int
+            The number of the plane to select in the mask.
+
+        Returns
+        -------
+        plane_mask: np.array
+            A boolean mask corresponding to the metric dimensions
+            and the requested tpc/plane.
+        """
+        if metric in self.median_noise_data.columns:
+            blank_mask = np.repeat(True, len(self.median_noise_data))
+            tpc_mask = (self.median_noise_data['tpc'] == tpc if tpc is not None else blank_mask)
+            plane_mask = (self.median_noise_data['plane'] == plane if plane is not None else blank_mask)
+        else:
+            blank_mask = np.repeat(True, len(self.noise_data))
+            tpc_mask = (self.noise_data['tpc'] == tpc if tpc is not None else blank_mask)
+            plane_mask = (self.noise_data['plane'] == plane if plane is not None else blank_mask)
+        return tpc_mask & plane_mask
+    
+    def get_styling(self, metric):
+        """
+        Retrieves default bin sizes, labels, and ranges for the
+        specified metric
+
+        Parameters
+        ----------
+        metric: str
+            The metric name.
+
+        Returns
+        -------
+        style: list
+            List containing as elements (in order) the x-axis label,
+            x-axis range, and the bin count.
+        """
+        return {'raw_rms': ['RMS [ADC]', (0, 10), 50],
+                'int_rms': ['RMS [ADC]', (0, 10), 50],
+                'coh_rms': ['RMS [ADC]', (0, 10), 50],
+                'raw_rms_e2eabs': ['Difference [ADC]', (-1.25, 1.25), 50],
+                'raw_rms_c2cabs': ['Difference [ADC]', (-1.25, 1.25), 50],
+                'raw_rms_e2erel': ['Relative Difference', (-0.25, 0.25), 50],
+                'raw_rms_c2crel': ['Relative Difference', (-0.25, 0.25), 50],
+                'hit_occupancy': ['Hit Occupancy', (0, 5), 25],
+                'mhit_sadc': ['Max Hit Summed ADC [ADC]', (0,1000), 50],
+                'mhit_height': ['Max Hit Height [ADC]', (0,100), 50]}[metric]
     
     def get_ffts(self, group) -> np.array:
         """
