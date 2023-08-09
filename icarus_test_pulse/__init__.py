@@ -1,1 +1,1 @@
-from .test_pulse_utilities import average_pulse, average_waveform
+from .test_pulse_utilities import average_pulse, average_waveform, compare_average_pulse, plot_single_test_waveform

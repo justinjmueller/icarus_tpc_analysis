@@ -56,7 +56,7 @@ def align_and_average(waveforms, max=True, size=1250) -> np.array:
     waveform = np.roll(waveform, 75-tcenter)[0:150]
     return waveform
 
-def average_pulse(path, run, fragment, ch, title, evt=1, scale=2200, internal=False):
+def average_pulse(path, run, fragment, ch, title, evt=1, scale=2200, internal=False, nchannels=64) -> None:
     """
     Plots the average test pulse shape for both the positive lobe and
     the inverted negative lobe. Waveform input files should be comma
@@ -83,6 +83,8 @@ def average_pulse(path, run, fragment, ch, title, evt=1, scale=2200, internal=Fa
         The y-range of the plot. The range will be set to (-250, scale).
     internal: bool
         Boolean flag denoting internal vs. external test pulse.
+    nchannels: int
+        Number of channels to range over for the averaging. 
 
     Returns
     -------
@@ -93,7 +95,7 @@ def average_pulse(path, run, fragment, ch, title, evt=1, scale=2200, internal=Fa
     figure = plt.figure(figsize=(8,6))
     ax = figure.add_subplot()
 
-    waveforms = load_waveform_file(path, run, fragment, evt)[ch:ch+64:2 if internal else 1,:]
+    waveforms = load_waveform_file(path, run, fragment, evt)[ch:ch+nchannels:2 if internal else 1,:]
     pwaveform = align_and_average(waveforms, max=True, size=1250)
     mwaveform = -1 * align_and_average(waveforms, max=False, size=1250)
 
@@ -106,7 +108,7 @@ def average_pulse(path, run, fragment, ch, title, evt=1, scale=2200, internal=Fa
     ax.legend()
     figure.suptitle(title)
 
-def average_waveform(path, run, fragment, ch, title, evt=1, scale=2200, internal=False):
+def average_waveform(path, run, fragment, ch, title, evt=1, scale=2200, internal=False, nchannels=64):
     """
     Plots the average test pulse waveform. Waveform input files should be comma
     separated with each waveform in a crate having its own separate
@@ -132,16 +134,106 @@ def average_waveform(path, run, fragment, ch, title, evt=1, scale=2200, internal
         The y-range of the plot. The range will be set to (-scale, scale).
     internal: bool
         Boolean flag denoting internal vs. external test pulse.
+    nchannels: int
+        Number of channels to range over for the averaging. 
+
+    Returns
+    -------
+    None.
     """
     plt.style.use('../plot_style.mplstyle')
 
     figure = plt.figure(figsize=(14,6))
     ax = figure.add_subplot()
 
-    waveforms = load_waveform_file(path, run, fragment, evt)[ch:ch+64:2 if internal else 1,:]
+    waveforms = load_waveform_file(path, run, fragment, evt)[ch:ch+nchannels:2 if internal else 1,:]
     waveform = np.mean(np.roll(waveforms, np.argmax(waveforms, axis=1), axis=0), axis=0)
     
     ax.plot(np.arange(4096), waveform, linestyle='-', linewidth=1)
+    ax.set_xlim(0,4096)
+    ax.set_ylim(-scale, scale)
+    ax.set_xlabel('Time [ticks]')
+    ax.set_ylabel('Waveform Height [ADC]')
+    figure.suptitle(title)
+
+def compare_average_pulse(path, runs, fragments, chs, strides, nchannels, labels, title, evt=1, scale=2200) -> None:
+    """
+    Plots the average test pulse shapes for each of the input runs.
+    Waveform input files should be comma separated with each waveform
+    a crate having its own separate line in the file.
+
+    Parameters
+    ----------
+    path: str
+        The base path to the input files.
+    runs: list[int]
+        The list of run numbers for the test pulse input.
+    fragments: list[int]
+        The list of the fragment IDs of the pulsed crates.
+    chs: list[int]
+        The list of the first channels in each of the pulsed crates.
+    strides: list[int]
+        The list of strides to use when selecting channels from the
+        input waveforms (e.g. internal test pulses use every other
+        channel, so stride=2).
+    nchannels: list[int]
+        The list of the number of channels to range over for the
+        averaging.
+    labels: list[str]
+        The list of labels to use in the legend.
+    title: str
+        The title of the plot.
+    evt: int
+        The number of the event.
+    scale: float
+        The y-range of the plot. The range will be set to (-250, scale).
+
+    Returns
+    -------
+    None.
+    """
+
+    plt.style.use('../plot_style.mplstyle')
+
+    figure = plt.figure(figsize=(8,6))
+    ax = figure.add_subplot()
+
+    for ri, r in enumerate(runs):
+        waveforms = load_waveform_file(path, r, fragments[ri], evt)[chs[ri]:chs[ri]+nchannels[ri]:strides[ri],:]
+        waveform = align_and_average(waveforms, max=True, size=1250)
+        ax.plot(np.arange(150), waveform, linestyle='-', linewidth=2, label=labels[ri])
+
+    ax.set_xlim(0,150)
+    ax.set_ylim(-250, scale)
+    ax.set_xlabel('Time [ticks]')
+    ax.set_ylabel('Waveform Height [ADC]')
+    ax.legend()
+    figure.suptitle(title)
+
+def plot_single_test_waveform(path, run, fragment, title, evt, ch, scale=2200) -> None:
+    """
+    Plots a single waveform. Waveform input files should be comma
+    separated with each waveform in a crate having its own separate
+    line in the file.
+
+    Parameters
+    ----------
+    path: str
+        The base path to the input files.
+    run: int
+        The run number.
+    fragment: int
+        The integer representation of the fragment ID.
+    title: str
+
+    """
+    plt.style.use('../plot_style.mplstyle')
+
+    figure = plt.figure(figsize=(16,6))
+    ax = figure.add_subplot()
+
+    waveform = load_waveform_file(path, run, fragment, evt)[ch, :]
+    ax.plot(np.arange(4096), waveform, linestyle='-', linewidth=2)
     ax.set_xlim(0,4096)
     ax.set_ylim(-scale, scale)
     ax.set_xlabel('Time [ticks]')
