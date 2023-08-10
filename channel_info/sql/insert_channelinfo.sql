@@ -1,0 +1,1 @@
+INSERT INTO channelinfo(channel_id, tpc_number, plane_number, wire_number, slot_id, local_id, group_id, fragment_id, flange_number, flange_name, cable_number, channel_type) VALUES (?,?,?,?,?,?,?,?,?,?,?,?);
