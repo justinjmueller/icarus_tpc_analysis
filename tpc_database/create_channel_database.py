@@ -15,6 +15,7 @@ def main():
 
     # Create the tables (if they do not exist).
     command(curs, f'{SQL_PATH}create_channelinfo.sql')
+    command(curs, f'{SQL_PATH}create_flatcables.sql')
 
     # Table: channelinfo
     daq_channels = pd.read_csv(f'{INPUT_PATH}daq_channels.csv')
@@ -31,6 +32,12 @@ def main():
                                'group_id', 'fragment_id', 'flange_number', 'flange_name', 'cable_number', 'channel_type']]
     vals = [tuple(x) for x in channelinfo.to_numpy()]
     command(curs, f'{SQL_PATH}insert_channelinfo.sql', vals=vals)
+    conn.commit()
+
+    # Table: flatcables
+    flatcables = pd.read_csv(f'{INPUT_PATH}cables.csv')
+    vals = [tuple(x) for x in flatcables.to_numpy()]
+    command(curs, f'{SQL_PATH}insert_flatcables.sql', vals=vals)
     conn.commit()
 
     conn.close()

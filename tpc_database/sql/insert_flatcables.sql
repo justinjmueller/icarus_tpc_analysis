@@ -1,0 +1,1 @@
+INSERT INTO flatcables(cable_number, plane_type, crimp_style_at_ft, crimp_style_at_wire, geometric_length, cable_length_code, real_length, capacitance) VALUES(?,?,?,?,?,?,?,?);

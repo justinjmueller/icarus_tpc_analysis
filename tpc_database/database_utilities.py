@@ -24,6 +24,7 @@ def command(curs, comm, vals=None) -> None:
         else:
             curs.execute(sql_command)
     except Exception as e:
+        print(e)
         print(f'Caught exception with command {comm} and values {vals}.')
 
 def fix_cable_label(l, tpc) -> str:
