@@ -194,7 +194,11 @@ def get_physical_wire_for_channel(g) -> tuple[float]:
     y0, z0 = endpoints[0,:]
     y1, z1 = endpoints[-1,:]
     length = np.sum(g['length'].astype(float))
-    if g['p'].iloc[0] == 0:
+    if float(g['p'].iloc[0]) == 0:
         length = 942.0
+        if z0 != 0:
+            z0 = 942.0 * np.sign(z0)
+        if z1 != 0:
+            z1 = 942.0 * np.sign(z1)
     capacitance = length * (0.20 if g['p'].iloc[0] != 1 else 0.21)
     return x, y0, z0, y1, z1, length, capacitance
