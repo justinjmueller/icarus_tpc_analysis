@@ -1,11 +1,11 @@
 import numpy as np
 import pandas as pd
 import sqlite3
-from database_utilities import command, fix_cable_label, map_channels_to_fragment
+from database_utilities import *
 
 # Configuration
 DB_PATH = '/Users/mueller/Projects/channel_status/db/icarus_channels_dev.db'
-SQL_PATH = '/Users/mueller/Projects/GitRepos/ICARUSNoiseAnalysis/channel_info/sql/'
+SQL_PATH = '/Users/mueller/Projects/GitRepos/ICARUSNoiseAnalysis/tpc_database/sql/'
 INPUT_PATH = '/Users/mueller/Projects/channel_status/inputs/'
 
 def main():
@@ -16,6 +16,9 @@ def main():
     # Create the tables (if they do not exist).
     command(curs, f'{SQL_PATH}create_channelinfo.sql')
     command(curs, f'{SQL_PATH}create_flatcables.sql')
+    command(curs, f'{SQL_PATH}create_logicalwires.sql')
+    command(curs, f'{SQL_PATH}create_physicalwires.sql')
+
 
     # Table: channelinfo
     daq_channels = pd.read_csv(f'{INPUT_PATH}daq_channels.csv')
@@ -38,6 +41,25 @@ def main():
     flatcables = pd.read_csv(f'{INPUT_PATH}cables.csv')
     vals = [tuple(x) for x in flatcables.to_numpy()]
     command(curs, f'{SQL_PATH}insert_flatcables.sql', vals=vals)
+    conn.commit()
+
+    # Table: logicalwires
+    lines = open(f'{INPUT_PATH}ICARUS-channelmap.txt').readlines()
+    line_has_channel = ['C:' in x and 'T:' in x and 'P:' in x and 'W:' and '=>' in x in x for x in lines]
+    channel_entries = np.array([parse_map_entry(x) for xi, x in enumerate(lines) if line_has_channel[xi]])
+    logicalwires = pd.DataFrame(channel_entries, columns=['channel_id', 'c', 't', 'p', 'w'])
+    vals = [tuple(x) for x in logicalwires[['channel_id', 'w', 'c', 't', 'p']].to_numpy(dtype=float)][:5]
+    command(curs, f'{SQL_PATH}insert_logicalwires.sql', vals=vals)
+    conn.commit()
+
+    # Table: physicalwires
+    lines = open(f'{INPUT_PATH}ICARUS-geometry.txt').readlines()
+    line_has_wire = ['C:' in x and 'T:' in x and 'P:' in x and 'W:' in x for x in lines]
+    wire_entries = np.array([parse_wire_entry(x) for xi, x in enumerate(lines) if line_has_wire[xi]])
+    wires = pd.DataFrame(wire_entries, columns=['c', 't', 'p', 'w', 'length', 'x', 'y0', 'z0', 'y1', 'z1'])
+    wires = wires.merge(logicalwires, left_on=['c', 't', 'p', 'w'], right_on=['c', 't', 'p', 'w'])
+    vals = [(float(n), *get_physical_wire_for_channel(g)) for n, g in wires.groupby('channel_id')]
+    command(curs, f'{SQL_PATH}insert_physicalwires.sql', vals=vals)
     conn.commit()
 
     conn.close()

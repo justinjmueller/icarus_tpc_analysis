@@ -1,0 +1,1 @@
+INSERT INTO logicalwires(channel_id, wire_number, c, t, p) VALUES(?,?,?,?,?);

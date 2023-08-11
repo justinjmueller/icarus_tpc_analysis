@@ -1,0 +1,1 @@
+INSERT INTO physicalwires(channel_id, x, y0, z0, y1, z1, length, capacitance) VALUES(?,?,?,?,?,?,?,?);
