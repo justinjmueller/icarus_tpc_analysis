@@ -53,3 +53,4 @@ build/*
 csv/*
 .DS_Store
 .vscode/*
+*.dSYM
