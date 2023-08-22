@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import uproot
 
 def load_waveform_file(path, run, fragment, evt) -> np.array:
     """
@@ -225,7 +226,9 @@ def plot_single_test_waveform(path, run, fragment, title, evt, ch, scale=2200) -
     fragment: int
         The integer representation of the fragment ID.
     title: str
-
+        The title to place on the plot.
+    scale: float
+        The y-range of the plot. The range will be set to (-scale, scale).
     """
     plt.style.use('../plot_style.mplstyle')
 
@@ -238,4 +241,82 @@ def plot_single_test_waveform(path, run, fragment, title, evt, ch, scale=2200) -
     ax.set_ylim(-scale, scale)
     ax.set_xlabel('Time [ticks]')
     ax.set_ylabel('Waveform Height [ADC]')
+    figure.suptitle(title)
+
+def plot_average_waveform_artdaq(path, run, title, channel=0, scale=2200):
+    """
+    Plots the average waveform for the specified channel using a ROOT
+    file prepared by the TPCTestPulseArtDAQ module. This module aligns
+    waveforms and stores them (as a sum) in a TH2I with a set of bins
+    for each channel.
+
+    Parameters
+    ----------
+    path: str
+        The base path to the input ROOT file.
+    run: int
+        The run number of the input ROOT file.
+    title: str
+        The title to place on the plot.
+    channel: int
+        The channel number to retrieve and plot.
+    scale: float
+        The y-range of the plot. The range will be set to (-scale, scale).
+    """
+    plt.style.use('../plot_style.mplstyle')
+    
+    figure = plt.figure(figsize=(16,6))
+    ax = figure.add_subplot()
+    
+    data = uproot.open(f'{path}waveforms_run{run}.root')['tpctestpulseartdaq/output'].values()
+    waveform, count = data[:-1, channel].astype(float), data[-1,channel]
+    waveform -= np.median(waveform)
+    waveform /= count
+    ax.plot(np.arange(len(waveform)), waveform, linestyle='-', linewidth=2)
+    ax.set_xlim(0, len(waveform))
+    ax.set_ylim(-scale, scale)
+    ax.set_xlabel('Time [ticks]')
+    ax.set_ylabel('Waveform Height [ADC]')
+    figure.suptitle(title)
+
+def plot_average_pulse_artdaq(path, run, title, channel=0, scale=2200):
+    """
+    Plots the average waveform for the specified channel using a ROOT
+    file prepared by the TPCTestPulseArtDAQ module. This module aligns
+    waveforms and stores them (as a sum) in a TH2I with a set of bins
+    for each channel.
+
+    Parameters
+    ----------
+    path: str
+        The base path to the input ROOT file.
+    run: int
+        The run number of the input ROOT file.
+    title: str
+        The title to place on the plot.
+    channel: int
+        The channel number to retrieve and plot.
+    scale: float
+        The y-range of the plot. The range will be set to (-250, scale).
+    """
+    plt.style.use('../plot_style.mplstyle')
+    
+    figure = plt.figure(figsize=(8,6))
+    ax = figure.add_subplot()
+    
+    data = uproot.open(f'{path}waveforms_run{run}.root')['tpctestpulseartdaq/output'].values()
+    waveform, count = data[:-1, channel].astype(float), data[-1,channel]
+    waveform -= np.median(waveform)
+    waveform /= count
+
+    pwaveform = waveform[:150]
+    mpeak = np.argmin(waveform)
+    mwaveform = -1 * waveform[mpeak-75:mpeak+75]
+    ax.plot(np.arange(150), pwaveform, linestyle='-', linewidth=2, label='Positive Lobe')
+    ax.plot(np.arange(150), mwaveform, linestyle='-', linewidth=2, label='Negative Lobe')
+    ax.set_xlim(0, 150)
+    ax.set_ylim(-250, scale)
+    ax.set_xlabel('Time [ticks]')
+    ax.set_ylabel('Waveform Height [ADC]')
+    ax.legend()
     figure.suptitle(title)
