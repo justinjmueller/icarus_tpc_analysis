@@ -312,8 +312,10 @@ def plot_average_pulse_artdaq(path, run, title, channel=0, scale=2200):
     pwaveform = waveform[:150]
     mpeak = np.argmin(waveform)
     mwaveform = -1 * waveform[mpeak-75:mpeak+75]
+    awaveform = (pwaveform + mwaveform) / 2.0
     ax.plot(np.arange(150), pwaveform, linestyle='-', linewidth=2, label='Positive Lobe')
     ax.plot(np.arange(150), mwaveform, linestyle='-', linewidth=2, label='Negative Lobe')
+    ax.plot(np.arange(150), awaveform, linestyle='-', linewidth=2, label='Average')
     ax.set_xlim(0, 150)
     ax.set_ylim(-250, scale)
     ax.set_xlabel('Time [ticks]')
