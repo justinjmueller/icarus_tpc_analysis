@@ -243,6 +243,47 @@ def plot_single_test_waveform(path, run, fragment, title, evt, ch, scale=2200) -
     ax.set_ylabel('Waveform Height [ADC]')
     figure.suptitle(title)
 
+def get_average_pulses_artdaq(path, run, which='average'):
+    """
+    Calculates the average pulse (for either signal lobe or the average)
+    of each channel in the input ROOT histogram.
+
+    Parameters
+    ----------
+    path: str
+        The base path to the input ROOT file.
+    run: int
+        The run number of the input ROOT file.
+    which: str
+        Which type of average pulse to return ('positive', 'negative', 'average').
+
+    Returns
+    -------
+    pulses: numpy.array
+        The average pulse for each channel in the ROOT histogram.
+        Shape = (nchannels=576, nticks=150).
+    """
+
+    data = uproot.open(f'{path}waveforms_run{run}.root')['tpctestpulseartdaq/output'].values()
+    waveforms, counts = data[:-1, :].astype(float), data[-1, :]
+    waveforms -= np.median(waveforms, axis=0)
+    waveforms[:, counts > 0] /= counts[counts > 0]
+
+    ppeaks = np.argmax(waveforms, axis=0)
+    ppeaks[ppeaks < 75] = 75
+    mpeaks = np.argmin(waveforms, axis=0)
+    mpeaks[mpeaks < 75] = 75
+    pwaveform = np.vstack([waveforms[x-75:x+75, xi] for xi, x in enumerate(ppeaks)])
+    mwaveform = -1 * np.vstack([waveforms[x-75:x+75, xi] for xi, x in enumerate(mpeaks)])
+    if which == 'average':
+        pulses = (pwaveform+mwaveform)[:, :150] / 2.0
+    elif which == 'positive':
+        pulses = pwaveform[:, :150]
+    else:
+        pulses = mwaveform[:, :150]
+
+    return pulses
+
 def plot_average_waveform_artdaq(path, run, title, channel=0, scale=2200):
     """
     Plots the average waveform for the specified channel using a ROOT
@@ -271,6 +312,7 @@ def plot_average_waveform_artdaq(path, run, title, channel=0, scale=2200):
     data = uproot.open(f'{path}waveforms_run{run}.root')['tpctestpulseartdaq/output'].values()
     waveform, count = data[:-1, channel].astype(float), data[-1,channel]
     waveform -= np.median(waveform)
+    print(f'Count: {count}')
     waveform /= count
     ax.plot(np.arange(len(waveform)), waveform, linestyle='-', linewidth=2)
     ax.set_xlim(0, len(waveform))
@@ -313,6 +355,8 @@ def plot_average_pulse_artdaq(path, run, title, channel=0, scale=2200):
     mpeak = np.argmin(waveform)
     mwaveform = -1 * waveform[mpeak-75:mpeak+75]
     awaveform = (pwaveform + mwaveform) / 2.0
+    print(f'Max: {np.max(waveform)} [ADC]')
+    print(f'Integral: {np.sum(awaveform) * 0.4:.2f} [ADC * us]')
     ax.plot(np.arange(150), pwaveform, linestyle='-', linewidth=2, label='Positive Lobe')
     ax.plot(np.arange(150), mwaveform, linestyle='-', linewidth=2, label='Negative Lobe')
     ax.plot(np.arange(150), awaveform, linestyle='-', linewidth=2, label='Average')
@@ -322,3 +366,58 @@ def plot_average_pulse_artdaq(path, run, title, channel=0, scale=2200):
     ax.set_ylabel('Waveform Height [ADC]')
     ax.legend()
     figure.suptitle(title)
+
+def plot_all_connectors(path, run, fragment, title, scale=2200):
+    """
+    Wrapper function for plotting a single test waveform for each connector.
+
+    Parameters
+    ----------
+    path: str
+        The base path to the input files.
+    run: int
+        The run number.
+    fragment: int
+        The integer representation of the fragment ID.
+    title: str
+        The title to place on the plot.
+    scale: float
+        The y-range of the plot. The range will be set to (-scale, scale).
+
+    Returns
+    -------
+    None.
+    """
+    plot_single_test_waveform(path, run, fragment, f'Run {run}: {title}CONN 3)', 1, 0, scale=1600)   # Connector 3
+    plot_single_test_waveform(path, run, fragment, f'Run {run}: {title}CONN 1)', 1, 32, scale=1600)  # Connector 1
+    plot_single_test_waveform(path, run, fragment, f'Run {run}: {title}CONN 4)', 1, 512, scale=1600) # Connector 2
+    plot_single_test_waveform(path, run, fragment, f'Run {run}: {title}CONN 2)', 1, 544, scale=1600) # Connector 4
+
+def get_pulse_statistics_artdaq(path, run):
+    """
+    Prints a list of the connectors (assuming a standard connection)
+    which are actively being pulsed.
+
+    Parameters
+    ----------
+    path: str
+        The base path to the input ROOT file.
+    run: int
+        The run number of the input ROOT file.
+
+    Returns
+    -------
+    None.
+    """
+    data = uproot.open(f'{path}waveforms_run{run}.root')['tpctestpulseartdaq/output'].values()
+    waveforms, count = data[:-1, :].astype(float), data[-1, :]
+    waveforms -= np.median(waveforms, axis=0)
+    channels = np.arange(576)
+    mask_threshold = np.any(waveforms > 1.75e5, axis=0)
+
+    conn1_mask = ((channels % 64 >= 32) & (channels < 512))
+    conn2_mask = ((channels % 64 >= 32) & (channels >= 512))
+    conn3_mask = ((channels % 64 < 32) & (channels < 512))
+    conn4_mask = ((channels % 64 < 32) & (channels >= 512))
+
+    print(f'Run {run}: ({np.sum(mask_threshold & conn1_mask) > 128}, {np.sum(mask_threshold & conn2_mask) > 16}, {np.sum(mask_threshold & conn3_mask) > 128}, {np.sum(mask_threshold & conn4_mask) > 16})')
