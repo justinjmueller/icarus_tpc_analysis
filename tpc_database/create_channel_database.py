@@ -4,7 +4,7 @@ import sqlite3
 from database_utilities import *
 
 # Configuration
-DB_PATH = '/Users/mueller/Projects/channel_status/db/icarus_channels_dev.db'
+DB_PATH = '/Users/mueller/Projects/channel_status/db/icarus_channels.db'
 SQL_PATH = '/Users/mueller/Projects/GitRepos/ICARUSNoiseAnalysis/tpc_database/sql/'
 INPUT_PATH = '/Users/mueller/Projects/channel_status/inputs/'
 
@@ -48,7 +48,7 @@ def main():
     line_has_channel = ['C:' in x and 'T:' in x and 'P:' in x and 'W:' and '=>' in x in x for x in lines]
     channel_entries = np.array([parse_map_entry(x) for xi, x in enumerate(lines) if line_has_channel[xi]])
     logicalwires = pd.DataFrame(channel_entries, columns=['channel_id', 'c', 't', 'p', 'w'])
-    vals = [tuple(x) for x in logicalwires[['channel_id', 'w', 'c', 't', 'p']].to_numpy(dtype=float)][:5]
+    vals = [tuple(x) for x in logicalwires[['channel_id', 'w', 'c', 't', 'p']].to_numpy(dtype=float)]
     command(curs, f'{SQL_PATH}insert_logicalwires.sql', vals=vals)
     conn.commit()
 
