@@ -69,7 +69,7 @@ def map_channels_to_fragment(df) -> tuple[np.array, np.array]:
     """
     channel_id = df['channel_id'].to_numpy()
     chimney_number = df['flange_number'].to_numpy()
-    group_id = df['group_id'].to_numpy()
+    group_id = channel_id // 32
     group_bin = np.digitize(group_id % 432, [18, 36, 54, 72])
     offsets = np.array([-1, -2, 1, 0, 3])[group_bin]
     offsets[(chimney_number != 1) & (chimney_number != 20)] = 0

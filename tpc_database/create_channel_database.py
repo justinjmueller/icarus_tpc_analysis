@@ -27,8 +27,11 @@ def main():
                                               'chimney_number': 'flange_number', 'cable_label_number': 'cable_number'})
     channelinfo['tpc_number'] = (channelinfo['channel_id'] / 13824).astype(int)
     channelinfo['plane_number'] = np.digitize(channelinfo['channel_id'] % 13824, [2304, 8064, 13824])
-    channelinfo['group_id'] = (channelinfo['channel_id'] / 32).astype(int)
     channelinfo['fragment_id'], channelinfo['flange_name'] = map_channels_to_fragment(channelinfo)
+    crate_number = (channelinfo['fragment_id']/2 - 2048).astype(int) - 116*((channelinfo['fragment_id']-4096)/256).astype(int)
+    channelinfo['group_id'] = 18 * crate_number + 2*channelinfo['slot_id'] + (channelinfo['local_id'] / 32).astype(int)
+    #(channelinfo['channel_id'] / 32).astype(int)
+    
     channelinfo['cable_number'] = [fix_cable_label(x[0], x[1]) for x in channelinfo[['cable_number', 'tpc_number']].to_numpy()]
     channelinfo = channelinfo[['channel_id', 'tpc_number', 'plane_number', 'wire_number', 'slot_id', 'local_id',
                                'group_id', 'fragment_id', 'flange_number', 'flange_name', 'cable_number', 'channel_type']]

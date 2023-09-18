@@ -152,7 +152,9 @@ class Dataset:
             bins and the first axis contains the raw, intrinsic, and
             coherent components of the noise respectively.
         """
-        groups = np.arange(1728)[np.digitize(np.arange(1728) % 432, [72, 252, 432]) == plane]
+        conn = sqlite3.connect(SQLITE_CHANNEL_MAP_PATH)
+        groups = pd.read_sql_query(f"SELECT DISTINCT group_id FROM channelinfo WHERE tpc_number={plane};", conn)['group_id']
+        conn.close()
         all_ffts = np.dstack([self.get_ffts(x) for x in groups])
         return np.mean(all_ffts, axis=-1)
 
@@ -173,7 +175,7 @@ class Dataset:
         """
         columns = list(input_df.columns)
         conn = sqlite3.connect(SQLITE_CHANNEL_MAP_PATH)
-        chmap = pd.read_sql_query("SELECT channel_id, flange_name FROM channelinfo", conn)
+        chmap = pd.read_sql_query("SELECT channel_id, flange_name FROM channelinfo;", conn)
         conn.close()
         data = input_df.merge(chmap[['channel_id', 'flange_name']], left_on='channel_id', right_on='channel_id')
         flange_map = dict(zip(data['fragment'], data['flange_name']))
