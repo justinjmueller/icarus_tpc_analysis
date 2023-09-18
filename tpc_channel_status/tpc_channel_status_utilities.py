@@ -405,9 +405,22 @@ def export_channel_status(export_name, icarus_db, status_df):
 
     conn = sqlite3.connect(export_name)
     curs = conn.cursor()
-    command = 'CREATE TABLE IF NOT EXISTS channelstatus(channel_id integer NOT NULL PRIMARY KEY, reason text NOT NULL);'
+    command = 'CREATE TABLE IF NOT EXISTS channelstatus(channel_id integer NOT NULL PRIMARY KEY, reason text NOT NULL, diagnose_status text NOT NULL);'
     curs.execute(command)
-    insert = 'INSERT INTO channelstatus(channel_id, reason) VALUES(?,?);'
-    curs.executemany(insert, [(c, r)  for c, r in status_df[['channel_id', 'reason']].to_numpy()])
+    insert = 'INSERT INTO channelstatus(channel_id, reason, diagnose_status) VALUES(?,?,?);'
+    add_channels = np.arange(55296, dtype=int)[~np.isin(np.arange(55296, dtype=int), status_df['channel_id'])]
+    add_reasons = np.repeat('', len(add_channels))
+    add_df = pd.DataFrame({'channel_id': add_channels, 'reason': add_reasons})
+    status_df = pd.concat([status_df, add_df]).sort_values('channel_id')
+
+    reasons = np.unique(status_df['reason'])
+    reason_map = {r: 'kDEAD' if 'Low signal occupancy' in r else 'kGOOD' for r in reasons}
+    for r in reason_map.keys():
+        if 'Connectivity' in r or 'Isolated' in r:
+            reason_map[r] = 'kDEAD'
+        elif 'High raw noise' in r:
+            reason_map[r] = 'kNOISY'
+    status_df['diagnose_status'] = [reason_map[r] for r in status_df['reason']]
+    curs.executemany(insert, [(c, r, d)  for c, r, d in status_df[['channel_id', 'reason', 'diagnose_status']].to_numpy()])
     conn.commit()
     conn.close()
