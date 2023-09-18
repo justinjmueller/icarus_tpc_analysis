@@ -12,7 +12,8 @@
 
 #define EVENT_MAX 1000
 #define NOISE_THRESHOLD_LOW 2.00
-#define NOISE_THRESHOLD_HIGH 7.00
+#define NOISE_THRESHOLD_HIGH_IND1 8.00
+#define NOISE_THRESHOLD_HIGH_COLL 6.00
 #define NOISE_NORMED_THRESHOLD_LOW 0.005
 #define NOISE_NORMED_THRESHOLD_HIGH 0.015
 #define SIGNAL_THRESHOLD_HEIGHT 20
@@ -195,16 +196,13 @@ int main(int argc, char **argv)
         if(mhit_height < SIGNAL_THRESHOLD_HEIGHT)
         {
             if(raw_rms < NOISE_THRESHOLD_LOW) ++rms_low[channel_id];
-            if(raw_rms > NOISE_THRESHOLD_HIGH) ++rms_high[channel_id];
+            if(raw_rms > (channel_id % 13824 < 2304 ? NOISE_THRESHOLD_HIGH_IND1 : NOISE_THRESHOLD_HIGH_COLL)) ++rms_high[channel_id];
             if(int_rms / capacitance[channel_id] < NOISE_NORMED_THRESHOLD_LOW) ++rms_normed_low[channel_id];
             if(int_rms / capacitance[channel_id] > NOISE_NORMED_THRESHOLD_HIGH) ++rms_normed_high[channel_id];
         }
         else ++mhit_signal[channel_id];
         intrms_sum[channel_id] += int_rms;
         intrms_squaresum[channel_id] += int_rms*int_rms;
-
-        if(channel_id == 1795)
-            std::cerr << "Channel RMS: " << raw_rms << std::endl;
     }
 
     input->Close();
