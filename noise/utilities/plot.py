@@ -5,6 +5,11 @@ from matplotlib.collections import LineCollection
 from matplotlib import colors as colors
 from matplotlib import cm as cm
 from fnal import Dataset
+import sqlite3
+import sys
+
+sys.path.append('..')
+from globals import *
 
 def plot_ffts(datasets, labels, fft_type='raw', tpc=None) -> None:
     """
@@ -25,7 +30,7 @@ def plot_ffts(datasets, labels, fft_type='raw', tpc=None) -> None:
     -------
     None.
     """
-    plt.style.use('plot_style.mplstyle')
+    plt.style.use(PLOT_STYLE)
     figure = plt.figure(figsize=(9,7.5))
     planes = ['Induction 1', 'Induction 2', 'Collection']
     frequency = 0.610351563*np.arange(2049)    
@@ -72,7 +77,7 @@ def plot_planes_new(datasets, labels, metrics, title, tpc=None, normalize=False)
     -------
     None.
     """
-    plt.style.use('plot_style.mplstyle')
+    plt.style.use(PLOT_STYLE)
     if isinstance(datasets, list):
         datasets = [(d, metrics, tpc) for d in datasets]
     elif isinstance(metrics, list):
@@ -82,7 +87,7 @@ def plot_planes_new(datasets, labels, metrics, title, tpc=None, normalize=False)
     else:
         print('Misconfigured parameters for plot_planes.')
     
-    figure = plt.figure(figsize=(14,6))
+    figure = plt.figure(figsize=(14,8))
     gspec = figure.add_gridspec(16,3)
     haxs = [figure.add_subplot(gspec[2:13, p]) for p in [0,1,2]]
     planes = ['Induction 1', 'Induction 2', 'Collection']
@@ -92,10 +97,14 @@ def plot_planes_new(datasets, labels, metrics, title, tpc=None, normalize=False)
             style = d[0].get_styling(d[1])
             haxs[pi].hist(d[0][d[1]][mask], range=style[1], bins=style[2],
                           histtype='step', label=labels[di], density=normalize)
+            median = np.median(d[0][d[1]][mask])
+            color = plt.rcParams["axes.prop_cycle"].by_key()["color"][di]
+            haxs[pi].text(0.09+0.45*di, -0.25, f'{median:.2f} ADC', transform=haxs[pi].transAxes, verticalalignment='top', horizontalalignment='left', c=color, size=20)
         haxs[pi].set_xlim(style[1])
         haxs[pi].set_xlabel(style[0])
         haxs[pi].set_ylabel('Entries (Arb.)')
         haxs[pi].set_title(p)
+
     h, l = plt.gca().get_legend_handles_labels()
     bl = dict(zip(l,h))
     figure.suptitle(title)
@@ -121,7 +130,7 @@ def plot_planes(dataset, metric, mtype='e2e', tpc=None) -> None:
     -------
     None.
     """
-    plt.style.use('plot_style.mplstyle')
+    plt.style.use(PLOT_STYLE)
     figure = plt.figure(figsize=(14,6))
     gspec = figure.add_gridspec(16,3)
     haxs = [figure.add_subplot(gspec[2:13, p]) for p in [0,1,2]]
@@ -173,7 +182,7 @@ def plot_tpc(datasets, labels, metric='raw_rms', tpc=0) -> None:
     -------
     None.
     """
-    plt.style.use('plot_style.mplstyle')
+    plt.style.use(PLOT_STYLE)
     figure = plt.figure(figsize=(26,16))
     gspec = figure.add_gridspec(3,8)
     saxs = [figure.add_subplot(gspec[i,0:6]) for i in [0,1,2]]
@@ -229,7 +238,7 @@ def plot_crate(datasets, labels, metric='raw_rms', component='WW19', label_mean=
     -------
     None.
     """
-    plt.style.use('plot_style.mplstyle')
+    plt.style.use(PLOT_STYLE)
     figure = plt.figure(figsize=(8,6))
     ax = figure.add_subplot()
     for di, d in enumerate(datasets):
@@ -272,7 +281,7 @@ def plot_wire_planes(data, metric, metric_label, tpc=0):
     -------
     None.
     """
-    plt.style.use('plot_style.mplstyle')
+    plt.style.use(PLOT_STYLE)
     figure = plt.figure(figsize=(20,12))
     gspec = figure.add_gridspec(ncols=10, nrows=3)
     axs = [figure.add_subplot(gspec[i, :9]) for i in [0,1,2]]
@@ -280,9 +289,13 @@ def plot_wire_planes(data, metric, metric_label, tpc=0):
     cmap.set_clim(0,10)
     plane_label = {0: 'Induction 1', 1: 'Induction 2', 2: 'Collection'}
 
+    conn = sqlite3.connect(SQLITE_CHANNEL_MAP_PATH)
+    chmap = pd.read_sql_query("SELECT channel_id, z0, y0, z1, y1 FROM physicalwires", conn)
+    conn.close()
+
     for p in [0,1,2]:
-        mask = data.chmap['channel_id'] // 13824 == tpc
-        wires = data.chmap.loc[mask][['channel_id', 'z0', 'y0', 'z1', 'y1']]
+        mask = chmap['channel_id'] // 13824 == tpc
+        wires = chmap.loc[mask][['channel_id', 'z0', 'y0', 'z1', 'y1']]
         tmp = pd.DataFrame({'channel_id': data['channel_id'], metric: data[metric]}).loc[data['plane'] == p]
         wires = wires.merge(tmp, how='inner', left_on='channel_id', right_on='channel_id')
         cs = cmap.to_rgba(wires[metric])
@@ -300,15 +313,6 @@ def plot_wire_planes(data, metric, metric_label, tpc=0):
     tpc_name = {0: 'EE', 1: 'EW', 2: 'WE', 3: 'WW'}
     figure.suptitle(f'{metric_label.split(" [")[0]} by Plane for {tpc_name[tpc]}')
 
-"""
-    axcb.set_label(f'Status', fontsize=18)
-    axcb.solids.set_edgecolor('face')
-    cax.tick_params(labelsize=16)
-    tpc_name = {0: 'EE', 1: 'EW', 2: 'WE', 3: 'WW'}[tpc]
-    figure.suptitle(f'Channel Status of TPC: {tpc_name}',
-                    x=0.465, fontsize=24)
-"""
-
 def plot_waveform(waveform, title) -> None:
     """
     Plot a single waveform over its full range.
@@ -324,7 +328,7 @@ def plot_waveform(waveform, title) -> None:
     -------
     None.
     """
-    plt.style.use('plot_style.mplstyle')
+    plt.style.use(PLOT_STYLE)
     figure = plt.figure(figsize=(14,6))
     ax = figure.add_subplot()
     ax.plot(np.arange(4096), waveform, linestyle='-', linewidth=1)

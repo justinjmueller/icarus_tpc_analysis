@@ -3,32 +3,28 @@ import math
 import pandas as pd
 import uproot
 import matplotlib.pyplot as plt
+import sqlite3
 import warnings
+import sys
+
+sys.path.append('..')
+from globals import *
 
 class Dataset:
-    def __init__(self, path, run, suf=None, mc=False, toy=False) -> None:
+    def __init__(self, path) -> None:
         """
         Parameters
         ----------
         path: str
-            Path to input data file.
-        run: int
-            Run number for the data to load.
-        suf: str
-            If supplied, appends a suffix to the file name (e.g. suf='before' -> runXXXX_before.root)
-        mc: bool
-            Marks the dataset as a Monte Carlo dataset.
-        toy: bool
-            Marks the dataset as a toy dataset.
+            Full path to input data file.
 
         Returns
         -------
         None.
         """
-        plt.style.use('plot_style.mplstyle')
+        plt.style.use(PLOT_STYLE)
         pd.options.mode.chained_assignment = None
-        data = uproot.open(f'{path}/{"mc" if mc else "run"}{run}{"_"+suf if suf is not None else ""}.root')
-        self.chmap = pd.read_csv('channel_map.csv')
+        data = uproot.open(path)
         trimmed_keys = [x.split(';')[0] for x in data.keys()]
         if 'tpccorrelation' in trimmed_keys:
             self.correlations = data['tpccorrelation'].arrays(library='pd')
@@ -176,11 +172,14 @@ class Dataset:
         None.
         """
         columns = list(input_df.columns)
-        data = input_df.merge(self.chmap[['channel_id', 'flange']], left_on='channel_id', right_on='channel_id')
-        flange_map = dict(zip(data['fragment'], data['flange']))
+        conn = sqlite3.connect(SQLITE_CHANNEL_MAP_PATH)
+        chmap = pd.read_sql_query("SELECT channel_id, flange_name FROM channelinfo", conn)
+        conn.close()
+        data = input_df.merge(chmap[['channel_id', 'flange_name']], left_on='channel_id', right_on='channel_id')
+        flange_map = dict(zip(data['fragment'], data['flange_name']))
         data['plane'] = np.digitize(data['channel_id'] % 13824, [2304, 8064, 13824])
         data['tpc'] = data['channel_id'].to_numpy() // 13824
-        mask = (data['hits'] <= 3)
+        mask = (data['mhit_height'] <= 25)
         self.noise_data = data.loc[mask]
         self.median_noise_data = data.loc[mask].groupby('channel_id').median().reset_index()
         self.median_noise_data['flange'] = [flange_map[x] for x in self.median_noise_data['fragment']]

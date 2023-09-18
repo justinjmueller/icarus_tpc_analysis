@@ -3,6 +3,10 @@ import pandas as pd
 import struct
 from glob import glob
 import matplotlib.pyplot as plt
+import sys
+
+sys.path.append('..')
+from globals import *
 
 class INFNDataset:
     def __init__(self, path, nevts=10) -> None:
@@ -18,7 +22,7 @@ class INFNDataset:
         -------
         None.
         """
-        plt.style.use('plot_style.mplstyle')
+        plt.style.use(PLOT_STYLE)
         inputs = glob(f'{path}/*')
         if len(inputs) > nevts:
             inputs = inputs[:nevts]
