@@ -87,7 +87,7 @@ def plot_planes_new(datasets, labels, metrics, title, tpc=None, normalize=False)
     else:
         print('Misconfigured parameters for plot_planes.')
     
-    figure = plt.figure(figsize=(14,8))
+    figure = plt.figure(figsize=(14,6))
     gspec = figure.add_gridspec(16,3)
     haxs = [figure.add_subplot(gspec[2:13, p]) for p in [0,1,2]]
     planes = ['Induction 1', 'Induction 2', 'Collection']
