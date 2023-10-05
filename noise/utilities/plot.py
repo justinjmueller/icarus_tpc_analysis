@@ -53,7 +53,7 @@ def plot_ffts(datasets, labels, fft_type='raw', tpc=None) -> None:
     figure.text(0.55, 0.01, 'Frequency [kHz]', ha='center', fontsize=18)
     figure.text(0.01, 0.5, 'Power [$\mathrm{ADC^2}$/kHz]', va='center', rotation='vertical', fontsize=18)
 
-def plot_planes_new(datasets, labels, metrics, title, tpc=None, normalize=False) -> None:
+def plot_planes_new(datasets, labels, metrics, title, tpc=None, normalize=False, cap=None, wired_only=False) -> None:
     """
     Plots the desired metric(s) for the specified TPC and dataset(s)
     as a set of three 1D histograms.
@@ -72,6 +72,10 @@ def plot_planes_new(datasets, labels, metrics, title, tpc=None, normalize=False)
         The TPC(s) to be plotted.
     normalize: bool
         Toggles the normalization of each histogram.
+    cap: list[float] or float
+        If not None, applies a maximum to each plots y-axis.
+    wired_only: bool
+        Boolean flag for selecting only wired channels.
     
     Returns
     -------
@@ -93,17 +97,26 @@ def plot_planes_new(datasets, labels, metrics, title, tpc=None, normalize=False)
     planes = ['Induction 1', 'Induction 2', 'Collection']
     for pi, p in enumerate(planes):
         for di, d in enumerate(datasets):
-            mask = d[0].get_mask(d[1], tpc=d[2], plane=pi)
+            mask = d[0].get_mask(d[1], tpc=d[2], plane=pi, wired_only=wired_only)
             style = d[0].get_styling(d[1])
             haxs[pi].hist(d[0][d[1]][mask], range=style[1], bins=style[2],
                           histtype='step', label=labels[di], density=normalize)
             median = np.median(d[0][d[1]][mask])
             color = plt.rcParams["axes.prop_cycle"].by_key()["color"][di]
-            haxs[pi].text(0.09+0.45*di, -0.25, f'{median:.2f} ADC', transform=haxs[pi].transAxes, verticalalignment='top', horizontalalignment='left', c=color, size=20)
+            units = style[0].split('[')[1].split(']')[0] if '[' in style[0] else ''
+            if units == 'Arb.':
+                units = ''
+            haxs[pi].text(0.09+0.45*di, -0.25, f'{median:.2f} {units}', transform=haxs[pi].transAxes, verticalalignment='top', horizontalalignment='left', c=color, size=20)
         haxs[pi].set_xlim(style[1])
         haxs[pi].set_xlabel(style[0])
         haxs[pi].set_ylabel('Entries (Arb.)')
         haxs[pi].set_title(p)
+    if cap is not None:
+        for pi in [0,1,2]:
+            if isinstance(cap, list):
+                haxs[pi].set_ylim(0, cap[pi])
+            else:
+                haxs[pi].set_ylim(0, cap)
 
     h, l = plt.gca().get_legend_handles_labels()
     bl = dict(zip(l,h))
@@ -162,7 +175,7 @@ def plot_planes(dataset, metric, mtype='e2e', tpc=None) -> None:
     bl = dict(zip(l,h))
     figure.legend(bl.values(), bl.keys())
 
-def plot_tpc(datasets, labels, metric='raw_rms', tpc=0) -> None:
+def plot_tpc(datasets, labels, metric='raw_rms', tpc=0, wired_only=False) -> None:
     """
     Plots the desired metric (channel-to-channel by wire plane) for
     the specified TPC.
@@ -177,6 +190,8 @@ def plot_tpc(datasets, labels, metric='raw_rms', tpc=0) -> None:
         The key in the Dataset that specifies the metric.
     tpc: int or list[int]
         The index of the tpc(s) to select and plot.
+    wired_only: bool
+        Boolean flag for selecting only wired channels.
 
     Returns
     -------
@@ -193,7 +208,8 @@ def plot_tpc(datasets, labels, metric='raw_rms', tpc=0) -> None:
 
     for pi, p in enumerate(planes):
         for di, d in enumerate(datasets):
-            mask = ((d['tpc'] == tpc) & (d['plane'] == pi))
+            #mask = ((d['tpc'] == tpc) & (d['plane'] == pi))
+            mask = d.get_mask(metric, tpc=tpc, plane=pi, wired_only=wired_only)
             saxs[pi].scatter(d['channel_id'][mask], d[metric][mask], label=labels[di])
             xlow = 13824*tpc + sum(nchannels[:pi])
             xhigh = xlow + nchannels[pi]

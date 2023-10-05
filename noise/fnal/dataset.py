@@ -57,9 +57,11 @@ class Dataset:
         if key in self.median_noise_data.columns:
             return self.median_noise_data[key].to_numpy()
         else:
+            if key[0] == '!':
+                key = key[1:]
             return self.noise_data[key].to_numpy()
         
-    def get_mask(self, metric='raw_rms', tpc=None, plane=None) -> np.array:
+    def get_mask(self, metric='raw_rms', tpc=None, plane=None, wired_only=False) -> np.array:
         """
         Creates a mask for the designated tpc/plane using the shape
         of the provided metric.
@@ -72,22 +74,34 @@ class Dataset:
             The number of the TPC to select in the mask.
         plane: int
             The number of the plane to select in the mask.
+        wired_only: bool
+            Boolean flag to select only "wired" channels in the mask.
 
         Returns
         -------
         plane_mask: np.array
             A boolean mask corresponding to the metric dimensions
-            and the requested tpc/plane.
+            and the requested tpc/plane/wire status.
         """
+
+        if wired_only:
+            conn = sqlite3.connect(SQLITE_CHANNEL_MAP_PATH)
+            reject_channels = pd.read_sql_query(f"SELECT channel_id FROM channelinfo WHERE channel_type != 'wired';", conn)['channel_id']
+            conn.close()
+        else:
+            reject_channels = np.array([])
+
         if metric in self.median_noise_data.columns:
             blank_mask = np.repeat(True, len(self.median_noise_data))
             tpc_mask = (self.median_noise_data['tpc'] == tpc if tpc is not None else blank_mask)
             plane_mask = (self.median_noise_data['plane'] == plane if plane is not None else blank_mask)
+            channel_mask = (~np.isin(self.median_noise_data['channel_id'], reject_channels))
         else:
             blank_mask = np.repeat(True, len(self.noise_data))
             tpc_mask = (self.noise_data['tpc'] == tpc if tpc is not None else blank_mask)
             plane_mask = (self.noise_data['plane'] == plane if plane is not None else blank_mask)
-        return tpc_mask & plane_mask
+            channel_mask = (~np.isin(self.noise_data['channel_id'], reject_channels))
+        return tpc_mask & plane_mask & channel_mask
     
     def get_styling(self, metric):
         """
@@ -105,6 +119,8 @@ class Dataset:
             List containing as elements (in order) the x-axis label,
             x-axis range, and the bin count.
         """
+        if metric[0] == '!':
+            metric = metric[1:]
         return {'raw_rms': ['RMS [ADC]', (0, 10), 50],
                 'int_rms': ['RMS [ADC]', (0, 10), 50],
                 'coh_rms': ['RMS [ADC]', (0, 10), 50],
@@ -114,7 +130,8 @@ class Dataset:
                 'raw_rms_c2crel': ['Relative Difference', (-0.25, 0.25), 50],
                 'hit_occupancy': ['Hit Occupancy', (0, 5), 25],
                 'mhit_sadc': ['Max Hit Summed ADC [ADC]', (0,1000), 50],
-                'mhit_height': ['Max Hit Height [ADC]', (0,100), 50]}[metric]
+                'mhit_height': ['Max Hit Height [ADC]', (0,100), 50],
+                'fft_bin0': ['FFT First Bin Power [Arb.]', (0,10000), 50]}[metric]
     
     def get_ffts(self, group) -> np.array:
         """
@@ -269,6 +286,11 @@ class Dataset:
         if crate.upper() == 'ALL':
             title = 'Average Mini-Crate Correlation Matrix'
             cov = np.mean([self._get_correlation_matrix(i) for i in range(96)], axis=0)
+        elif crate.upper() == 'IND1':
+            title = 'Average Induction 1 Mini-Crate Correlation Matrix'
+            crates = [x+y for x in ['EE', 'EW', 'WE', 'WW'] for y in ['01M', '01T', '20M', '20T']]
+            crates = [self._map_crate(c) for c in crates]
+            cov = np.mean([self._get_correlation_matrix(c) for c in crates], axis=0)
         else:
             title = f'{crate.upper()} Correlation Matrix'
             crate = self._map_crate(crate)
