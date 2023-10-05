@@ -161,6 +161,7 @@ def get_blocks_tpc(histogram, tpc, noise_vals=None):
     conn.close()
     pairs = np.split(res[:,0], res.shape[0]/2)
     iswired = [np.any(x=='wired') for x in np.split(res[:,1], res.shape[0]/2)]
+    pairs = [np.array([x[0], x[1]])[[res[2*xi, 1]=='wired', res[2*xi+1, 1]=='wired']] for xi, x in enumerate(pairs)]
 
     blocks = [get_block_groups(histogram, g, gi+tpc*216) for gi, g in enumerate(pairs) if iswired[gi]]
     maps = [get_group_to_channel_block(g, gi+tpc*216) for gi, g in enumerate(pairs) if iswired[gi]]
