@@ -65,7 +65,7 @@ class TPDataset:
         Creates a new TPDataset by joining two TPDatasets.
     """
     
-    def __init__(self, path, dbpath, which='average', pulses=None):
+    def __init__(self, path, dbpath, which='average', tail=75, pulses=None):
         """
         Constructor for the TPDataset.
 
@@ -77,6 +77,10 @@ class TPDataset:
             The full path to the channel map SQLite file.
         which: str
             Which type of average pulse to return ('positive', 'negative', 'average').
+        tail: int
+            The time extent beyond the peak to save.
+        pulses: np.array
+            The array of pulses to copy into this object. For copy constructing.
         """
         if pulses is None:
 
@@ -88,20 +92,20 @@ class TPDataset:
 
                 ppeaks = np.argmax(waveforms, axis=0)
                 ppeaks[ppeaks < 75] = 75
-                ppeaks[ppeaks > waveforms.shape[0] - 75] = waveforms.shape[0] - 75
+                ppeaks[ppeaks > waveforms.shape[0] - tail] = waveforms.shape[0] - tail
                 mpeaks = np.argmin(waveforms, axis=0)
                 mpeaks[mpeaks < 75] = 75
-                mpeaks[mpeaks > waveforms.shape[0] - 75] = waveforms.shape[0] - 75
+                mpeaks[mpeaks > waveforms.shape[0] - tail] = waveforms.shape[0] - tail
                 self.ploc = ppeaks
                 self.mloc = mpeaks
-                pwaveform = np.vstack([waveforms[x-75:x+75, xi] for xi, x in enumerate(ppeaks)])
-                mwaveform = -1 * np.vstack([waveforms[x-75:x+75, xi] for xi, x in enumerate(mpeaks)])
+                pwaveform = np.vstack([waveforms[x-75:x+tail, xi] for xi, x in enumerate(ppeaks)])
+                mwaveform = -1 * np.vstack([waveforms[x-75:x+tail, xi] for xi, x in enumerate(mpeaks)])
                 if which == 'average':
-                    self.pulses = (pwaveform+mwaveform)[:, :150] / 2.0
+                    self.pulses = (pwaveform+mwaveform)[:, :75+tail] / 2.0
                 elif which == 'positive':
-                    self.pulses = pwaveform[:, :150]
+                    self.pulses = pwaveform[:, :75+tail]
                 else:
-                    self.pulses = mwaveform[:, :150]
+                    self.pulses = mwaveform[:, :75+tail]
                 self.is_pulsed = np.array([self._is_pulsed_channel(x) for x in self.pulses])
             else:
                 data = np.load(path)['arr_0']
@@ -168,7 +172,19 @@ class TPDataset:
                 'ploc': self.ploc, 'mloc': self.mloc,
                 'is_pulsed': self.is_pulsed}
         for k, v in self.metrics.items():
-            data[k] = [v[0](x, **v[1]) if self.is_pulsed[xi] else 0 for xi, x in enumerate(self.pulses)]
+            res = [v[0](x, **v[1]) if self.is_pulsed[xi] else 0 for xi, x in enumerate(self.pulses)]
+            if np.any([isinstance(r, dict) for r in res]):
+                keys = res[np.where([isinstance(r, dict) for r in res])[0]].keys()
+                for sk in res[0].keys():
+                    data[sk] = [r[sk] if sk in r.keys() else 0 for r in res]
+            elif np.any([isinstance(r, list) for r in res]) or np.any([isinstance(r, tuple) for r in res]):
+                num = len(res[np.array([isinstance(r, list) or isinstance(r, tuple) for r in res])[0]])
+                for i in range(num):
+                    print(res)
+                    data[f'{k}_{i}'] = [r[i] if len(r) > 1 else 0 for r in res]
+            else:
+                data[k] = [r for r in res]
+
         self.analysis_data = pd.DataFrame(data)
         return self.analysis_data
     
