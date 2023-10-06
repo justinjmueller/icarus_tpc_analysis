@@ -32,6 +32,8 @@ class TPDataset:
         The position of the readout board containing the channel.
     local_id: np.array
         The position of the channel within the readout board.
+    channel_type: np.array
+        The type of channel (wired, wireless, ghost, virtual).
     metrics: dict
         The dictonary containing the metrics (callables) keyed by name.
     analysis_data: pd.DataFrame
@@ -169,6 +171,7 @@ class TPDataset:
                 'flange_name': self.flange_name,
                 'slot_id': self.slot_id,
                 'local_id': self.local_id,
+                'channel_type': self.channel_type,
                 'ploc': self.ploc, 'mloc': self.mloc,
                 'is_pulsed': self.is_pulsed}
         for k, v in self.metrics.items():
@@ -304,13 +307,14 @@ class TPDataset:
         chmap['crate_number'] = (chmap['fragment_id']/2 - 2048).astype(int) - 116*((chmap['fragment_id']-4096)/256).astype(int)
         chmap['join_index'] = 576*chmap['crate_number'] + 64*chmap['slot_id'] + chmap['local_id']
         chmap_values = {chmap.iloc[i]['join_index']: i for i in range(len(chmap))}
-        keys = ['channel_id', 'flange_name', 'slot_id', 'local_id']
-        defaults = [-1, 'None', -1, -1]
+        keys = ['channel_id', 'flange_name', 'slot_id', 'local_id', 'channel_type']
+        defaults = [-1, 'None', -1, -1, 'None']
         chmap_data = [chmap.iloc[chmap_values[x]][keys] if x in chmap_values.keys() else defaults for x in self.chmap_join_index]
         self.channel_id = np.array([x[0] for x in chmap_data], dtype='int')
         self.flange_name = np.array([x[1] for x in chmap_data], dtype='str')
         self.slot_id = np.array([x[2] for x in chmap_data], dtype='int')
         self.local_id = np.array([x[3] for x in chmap_data], dtype='int')
+        self.channel_type = np.array([x[4] for x in chmap_data], dtype='str')
     
     def __repr__(self) -> str:
         """
@@ -349,6 +353,7 @@ class TPDataset:
         result.flange_name = self.flange_name
         result.slot_id = self.slot_id
         result.local_id = self.local_id
+        result.channel_type = self.channel_type
 
     def __add__(self, other):
         """
@@ -373,6 +378,7 @@ class TPDataset:
         result.flange_name = self.flange_name
         result.slot_id = self.slot_id
         result.local_id = self.local_id
+        result.channel_type = self.channel_type
 
     def join(self, other):
         """
@@ -404,4 +410,5 @@ class TPDataset:
         result.flange_name = self.flange_name
         result.slot_id = self.slot_id
         result.local_id = self.local_id
+        result.channel_type = self.channel_type
         return result
