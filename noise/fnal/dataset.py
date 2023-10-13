@@ -170,7 +170,7 @@ class Dataset:
             coherent components of the noise respectively.
         """
         conn = sqlite3.connect(SQLITE_CHANNEL_MAP_PATH)
-        groups = pd.read_sql_query(f"SELECT DISTINCT group_id FROM channelinfo WHERE tpc_number={plane};", conn)['group_id']
+        groups = pd.read_sql_query(f"SELECT DISTINCT group_id FROM channelinfo WHERE plane_number={plane};", conn)['group_id']
         conn.close()
         all_ffts = np.dstack([self.get_ffts(x) for x in groups])
         return np.mean(all_ffts, axis=-1)
@@ -265,7 +265,7 @@ class Dataset:
             offset += {'T': 0, 'M': 1, 'B': 2}[crate_name.upper()[4]]
         return offset
     
-    def plot_correlation_matrix(self, crate='WW19') -> None:
+    def plot_correlation_matrix(self, crate='WW19', save_path=None) -> None:
         """
         Plot the channel-to-channel correlation matrix of either a
         single mini-crate or the average over all mini-crates.
@@ -275,7 +275,9 @@ class Dataset:
         crate: str
             The name of the single mini-crate, or the keyword 'all'
             if the average is desired.
-
+        save_path: str
+            The full path specifying the location to save the plot.
+    
         Returns
         -------
         None.
@@ -284,23 +286,38 @@ class Dataset:
         ax = figure.add_subplot()
 
         if crate.upper() == 'ALL':
-            title = 'Average Mini-Crate Correlation Matrix'
-            cov = np.mean([self._get_correlation_matrix(i) for i in range(96)], axis=0)
+            title = 'All Crates'#'Average Mini-Crate Correlation Matrix'
+            cov = np.stack([self._get_correlation_matrix(i) for i in range(96)], axis=2)
         elif crate.upper() == 'IND1':
-            title = 'Average Induction 1 Mini-Crate Correlation Matrix'
+            title = 'Induction 1'#'Average Induction 1 Mini-Crate Correlation Matrix'
             crates = [x+y for x in ['EE', 'EW', 'WE', 'WW'] for y in ['01M', '01T', '20M', '20T']]
             crates = [self._map_crate(c) for c in crates]
-            cov = np.mean([self._get_correlation_matrix(c) for c in crates], axis=0)
+            cov = np.stack([self._get_correlation_matrix(c) for c in crates], axis=2)
+        elif crate.upper() == 'CORNER':
+            title = 'Corner Crates'#'Average Corner Mini-Crate Correlation Matrix'
+            crates = [x+y for x in ['EE', 'EW', 'WE', 'WW'] for y in ['01B', '01M', '01T', '20B', '20M', '20T']]
+            crates = [self._map_crate(c) for c in crates]
+            cov = np.stack([self._get_correlation_matrix(c) for c in crates], axis=2)
+        elif crate.upper() == 'STANDARD':
+            title = 'Standard Crates'#'Average Standard Mini-Crate Correlation Matrix'
+            crates = [f'{x}{y:02}' for x in ['EE', 'EW', 'WE', 'WW'] for y in range(2,20)]
+            crates = [self._map_crate(c) for c in crates]
+            cov = np.stack([self._get_correlation_matrix(c) for c in crates], axis=2)
         else:
             title = f'{crate.upper()} Correlation Matrix'
             crate = self._map_crate(crate)
-            cov = self._get_correlation_matrix(crate)
+            cov = np.stack([self._get_correlation_matrix(crate),])
+
+        cov = np.sum(cov, axis=2) / np.sum(cov != 0, axis=2)
 
         im = ax.imshow(cov, cmap='RdBu', vmin=-1.0, vmax=1.0)
-        figure.colorbar(im, ax=ax)
+        cbar = figure.colorbar(im, ax=ax)
+        cbar.set_label('$\\rho$')
         ax.set_xticks([64*i for i in range(10)])
         ax.set_yticks([64*i for i in range(10)])
         ax.set_xlabel('Channel Number')
         ax.set_ylabel('Channel Number')
         figure.suptitle(title)
+        if save_path is not None:
+            figure.savefig(save_path)
 
