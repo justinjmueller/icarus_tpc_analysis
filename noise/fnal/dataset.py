@@ -192,9 +192,19 @@ class Dataset:
         """
         columns = list(input_df.columns)
         conn = sqlite3.connect(SQLITE_CHANNEL_MAP_PATH)
-        chmap = pd.read_sql_query("SELECT channel_id, flange_name FROM channelinfo;", conn)
+        chmap = pd.read_sql_query("SELECT channel_id, flange_name, cable_number FROM channelinfo;", conn)
+        wires = pd.read_sql_query('SELECT * FROM physicalwires', conn)
+        cables = pd.read_sql_query('SELECT * FROM flatcables', conn)
         conn.close()
-        data = input_df.merge(chmap[['channel_id', 'flange_name']], left_on='channel_id', right_on='channel_id')
+        
+        cmap = lambda x: f'{x[0]}{((int(x[1:]) + 8) % 17):02}' if 'K' in x or 'F' in x else x
+        cables['cable_number'] = [cmap(x) for x in cables['cable_number']]
+        original_columns = ['channel_id', 'flange_name', 'wire_capacitance', 'cable_capacitance']
+        chmap = chmap.merge(wires, on='channel_id')
+        chmap = chmap.merge(cables, on='cable_number')
+        chmap.rename(columns={'capacitance_x': 'wire_capacitance', 'capacitance_y': 'cable_capacitance'}, inplace=True)
+        
+        data = input_df.merge(chmap[original_columns], left_on='channel_id', right_on='channel_id')
         flange_map = dict(zip(data['fragment'], data['flange_name']))
         data['plane'] = np.digitize(data['channel_id'] % 13824, [2304, 8064, 13824])
         data['tpc'] = data['channel_id'].to_numpy() // 13824

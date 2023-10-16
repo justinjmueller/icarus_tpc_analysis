@@ -11,20 +11,89 @@ import sys
 sys.path.append('..')
 from globals import *
 
-def plot_ffts(datasets, labels, fft_type='raw', tpc=None) -> None:
+def plot_board(dataset, metric, tpc=None, save_path=None) -> None:
+    """
+    Plots the desired metric for the specified TPC as a 2D histogram
+    across the common readout board grouping.
+
+    Parameters
+    ----------
+    dataset: Dataset
+        The Dataset to be plotted.
+    metric: str
+        The name of the metric.
+    tpc: int
+        The index of the TPC to select and plot.
+    save_path: str
+        The full path specifying the location to save the plot.
+
+    Returns
+    -------
+    None.
+    """
+    plt.style.use(PLOT_STYLE)
+    figure = plt.figure(figsize=(14,6))
+    gspec = figure.add_gridspec(16,2)
+    haxs = [figure.add_subplot(gspec[2:13, p]) for p in [0,1]]
+    wires = ['Induction 1', 'Standard']
+    style = dataset.get_styling(metric)
+    
+    mask = dataset.get_mask(metric, tpc=tpc, plane=0, wired_only=True)
+    haxs[0].hist2d(dataset['!local_id'][mask], dataset[metric][mask], bins=(64, style[2]), range=((0,64), style[1]), cmap='Blues')
+    haxs[0].set_xlim(0,64)
+    haxs[0].set_ylim(style[1])
+    haxs[0].set_xlabel('Local Channel Number')
+    haxs[0].set_ylabel(style[0])
+
+    mask = dataset.get_mask(metric, tpc=tpc, plane=1, wired_only=True) | dataset.get_mask(metric, tpc=tpc, plane=2, wired_only=True)
+    haxs[1].hist2d(dataset['!local_id'][mask], dataset[metric][mask], bins=(64, style[2]), range=((0,64), style[1]), cmap='Blues')
+    haxs[1].set_xlim(0,64)
+    haxs[1].set_ylim(style[1])
+    haxs[1].set_xlabel('Local Channel Number')
+    haxs[1].set_ylabel(style[0])
+
+def plot_capacitance_correlation(dataset, metric, save_path=None) -> None:
+    """
+    Plots a 2D histogram of total channel capacitance and the desired
+    metric.
+
+    Parameters
+    ----------
+    dataset: Dataset
+        The Dataset to be plotted.
+    metric: str
+        The name of the metric.
+    save_path: str
+        The full path specifying the location to save the plot.
+    """
+    plt.style.use(PLOT_STYLE)
+    figure = plt.figure(figsize=(8,6))
+    ax = figure.add_subplot()
+    mask = dataset.get_mask(metric, wired_only=True)
+    total_capacitance = dataset['wire_capacitance'][mask] + dataset['cable_capacitance'][mask]
+    ax.scatter(total_capacitance, dataset[metric][mask], cmap='Blues')
+    style = dataset.get_styling(metric)
+    ax.set_xlim(0, 500)
+    ax.set_ylim(style[1])
+    ax.set_xlabel('Channel Capacitance [pF]')
+    ax.set_ylabel(style[0])
+
+def plot_ffts(datasets, labels, fft_type='raw', tpc=None, save_path=None) -> None:
     """
     Plots the desired FFTs for the specifed TPC as a set of 1D scatterplots.
 
     Parameters
     ----------
-    datasets: list(Dataset)
+    datasets: Dataset or list[Dataset]
         The Datasets to be plotted.
-    labels: list(str)
+    labels: list[str]
         The labels for each Dataset.
-    fft_type: str
+    fft_type: str or list[str]
         The type of noise FFT to plot. Options: 'raw', 'int', 'coh'
     tpc: int
         The index of the TPC to select and plot.
+    save_path: str
+        The full path specifying the location to save the plot.
 
     Returns
     -------
@@ -36,11 +105,15 @@ def plot_ffts(datasets, labels, fft_type='raw', tpc=None) -> None:
     frequency = 0.610351563*np.arange(2049)    
     gspec = figure.add_gridspec(22,22)
     axs = [figure.add_subplot(gspec[7*p:7*(p+1),1:22]) for p in [0,1,2]]
-    fft_type = {'raw': 0, 'int': 1, 'coh': 2}[fft_type]
-    fft_label = ['Raw', 'Intrinsic', 'Coherent'][fft_type]
+    
+    if isinstance(datasets, list):
+        fft_type = [{'raw': 0, 'int': 1, 'coh': 2}[fft_type] for i in range(len(datasets))]
+    elif isinstance(fft_type, list):
+        fft_type = [{'raw': 0, 'int': 1, 'coh': 2}[f] for f in fft_type]
+        datasets = [datasets for i in range(len(fft_type))]
     for p in [0,1,2]:
         for di, d in enumerate(datasets):
-            fft = d.get_ffts_plane(p)[fft_type, :]
+            fft = d.get_ffts_plane(p)[fft_type[di], :]
             mask = ~np.isnan(fft)
             axs[p].scatter(frequency[mask], fft[mask]/1000, s=3, label=labels[di])
             axs[p].set_title(planes[p])
@@ -52,8 +125,10 @@ def plot_ffts(datasets, labels, fft_type='raw', tpc=None) -> None:
         
     figure.text(0.55, 0.01, 'Frequency [kHz]', ha='center', fontsize=18)
     figure.text(0.01, 0.5, 'Power [$\mathrm{ADC^2}$/kHz]', va='center', rotation='vertical', fontsize=18)
+    if save_path is not None:
+        figure.savefig(save_path)
 
-def plot_planes_new(datasets, labels, metrics, title, tpc=None, normalize=False, cap=None, wired_only=False) -> None:
+def plot_planes_new(datasets, labels, metrics, title, tpc=None, normalize=False, cap=None, wired_only=False, save_path=None) -> None:
     """
     Plots the desired metric(s) for the specified TPC and dataset(s)
     as a set of three 1D histograms.
@@ -76,6 +151,8 @@ def plot_planes_new(datasets, labels, metrics, title, tpc=None, normalize=False,
         If not None, applies a maximum to each plots y-axis.
     wired_only: bool
         Boolean flag for selecting only wired channels.
+    save_path: str
+        The full path specifying the location to save the plot.
     
     Returns
     -------
@@ -122,8 +199,10 @@ def plot_planes_new(datasets, labels, metrics, title, tpc=None, normalize=False,
     bl = dict(zip(l,h))
     figure.suptitle(title)
     figure.legend(bl.values(), bl.keys())
+    if save_path is not None:
+        figure.savefig(save_path)
 
-def plot_planes(dataset, metric, mtype='e2e', tpc=None) -> None:
+def plot_planes(dataset, metric, mtype='e2e', tpc=None, save_path=None) -> None:
     """
     Plots the desired metric (channel-to-channel by wire plane) for
     the specified TPC as a set of 1D histograms.
@@ -138,6 +217,8 @@ def plot_planes(dataset, metric, mtype='e2e', tpc=None) -> None:
         The sub-type(s) of the metric (e2e, c2c).
     tpc: int
         The index of the TPC to select and plot.
+    save_path: str
+        The full path specifying the location to save the plot.
 
     Returns
     -------
@@ -174,8 +255,10 @@ def plot_planes(dataset, metric, mtype='e2e', tpc=None) -> None:
     h, l = plt.gca().get_legend_handles_labels()
     bl = dict(zip(l,h))
     figure.legend(bl.values(), bl.keys())
+    if save_path is not None:
+        figure.savefig(save_path)
 
-def plot_tpc(datasets, labels, metric='raw_rms', tpc=0, wired_only=False) -> None:
+def plot_tpc(datasets, labels, metric='raw_rms', tpc=0, wired_only=False, save_path=None) -> None:
     """
     Plots the desired metric (channel-to-channel by wire plane) for
     the specified TPC.
@@ -192,6 +275,8 @@ def plot_tpc(datasets, labels, metric='raw_rms', tpc=0, wired_only=False) -> Non
         The index of the tpc(s) to select and plot.
     wired_only: bool
         Boolean flag for selecting only wired channels.
+    save_path: str
+        The full path specifying the location to save the plot.
 
     Returns
     -------
@@ -229,8 +314,10 @@ def plot_tpc(datasets, labels, metric='raw_rms', tpc=0, wired_only=False) -> Non
     if isinstance(tpc, int):
         tpc_name = {0: 'EE', 1: 'EW', 2: 'WE', 3: 'WW'}[tpc]
         figure.suptitle(f'{tpc_name} TPC')
+    if save_path is not None:
+        figure.savefig(save_path)
 
-def plot_crate(datasets, labels, metric='raw_rms', component='WW19', label_mean=False) -> None:
+def plot_crate(datasets, labels, metric='raw_rms', component='WW19', label_mean=False, save_path=None) -> None:
     """
     Plots the desired metric (channel-to-channel for the specified
     component) for each of the input Datasets. A Dataset can also
@@ -249,6 +336,8 @@ def plot_crate(datasets, labels, metric='raw_rms', component='WW19', label_mean=
     label_mean: bool
         Toggles the display of the arithmetic mean in the legend
         label for each dataset/metric.
+    save_path: str
+        The full path specifying the location to save the plot.
 
     Returns
     -------
@@ -276,8 +365,10 @@ def plot_crate(datasets, labels, metric='raw_rms', component='WW19', label_mean=
     ax.set_ylabel('RMS [ADC]')
     ax.legend()
     figure.suptitle(title)
+    if save_path is not None:
+        figure.savefig(save_path)
 
-def plot_wire_planes(data, metric, metric_label, tpc=0):
+def plot_wire_planes(data, metric, metric_label, tpc=0, save_path=None):
     """
     Create and save a plot displaying a per-plane view with each wire
     in its physical location colored by the specified metric.
@@ -292,6 +383,8 @@ def plot_wire_planes(data, metric, metric_label, tpc=0):
         The label for the metric.
     tpc: int
         The desired TPC to display (0, 1, 2, 3 = EE, EW, WE, WW).
+    save_path: str
+        The full path specifying the location to save the plot.
 
     Returns
     -------
@@ -328,8 +421,10 @@ def plot_wire_planes(data, metric, metric_label, tpc=0):
     axcb.solids.set_edgecolor('face')
     tpc_name = {0: 'EE', 1: 'EW', 2: 'WE', 3: 'WW'}
     figure.suptitle(f'{metric_label.split(" [")[0]} by Plane for {tpc_name[tpc]}')
+    if save_path is not None:
+        figure.savefig(save_path)
 
-def plot_waveform(waveform, title) -> None:
+def plot_waveform(waveform, title, save_path=None) -> None:
     """
     Plot a single waveform over its full range.
 
@@ -339,6 +434,8 @@ def plot_waveform(waveform, title) -> None:
         The input waveform to plot. Assumed shape of (4096,).
     title: str
         The title to be displayed at the top of the plot.
+    save_path: str
+        The full path specifying the location to save the plot.
 
     Returns
     -------
@@ -353,3 +450,5 @@ def plot_waveform(waveform, title) -> None:
     ax.set_xlabel('Time [ticks]')
     ax.set_ylabel('Waveform Height [ADC]')
     figure.suptitle(title)
+    if save_path is not None:
+        figure.savefig(save_path)
