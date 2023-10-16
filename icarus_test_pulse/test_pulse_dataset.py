@@ -34,6 +34,10 @@ class TPDataset:
         The position of the channel within the readout board.
     channel_type: np.array
         The type of channel (wired, wireless, ghost, virtual).
+    wire_capacitance: np.array
+        The capacitance of the channel's wire.
+    cable_capacitance: np.array
+        The capacitance of the channel's flat cable.
     metrics: dict
         The dictonary containing the metrics (callables) keyed by name.
     analysis_data: pd.DataFrame
@@ -172,6 +176,8 @@ class TPDataset:
                 'slot_id': self.slot_id,
                 'local_id': self.local_id,
                 'channel_type': self.channel_type,
+                'wire_capacitance': self.wire_capacitance,
+                'cable_capacitance': self.cable_capacitance,
                 'ploc': self.ploc, 'mloc': self.mloc,
                 'is_pulsed': self.is_pulsed}
         for k, v in self.metrics.items():
@@ -303,18 +309,27 @@ class TPDataset:
         """
         conn = sqlite3.connect(dbpath)
         chmap = pd.read_sql_query("SELECT * FROM channelinfo", conn)
+        wires = pd.read_sql_query('SELECT * FROM physicalwires', conn)
+        cables = pd.read_sql_query('SELECT * FROM flatcables', conn)
         conn.close()
+        cmap = lambda x: f'{x[0]}{((int(x[1:]) + 8) % 17):02}' if 'K' in x or 'F' in x else x
+        cables['cable_number'] = [cmap(x) for x in cables['cable_number']]
+        chmap = chmap.merge(wires, on='channel_id')
+        chmap = chmap.merge(cables, on='cable_number')
+        chmap.rename(columns={'capacitance_x': 'wire_capacitance', 'capacitance_y': 'cable_capacitance'}, inplace=True)
         chmap['crate_number'] = (chmap['fragment_id']/2 - 2048).astype(int) - 116*((chmap['fragment_id']-4096)/256).astype(int)
         chmap['join_index'] = 576*chmap['crate_number'] + 64*chmap['slot_id'] + chmap['local_id']
         chmap_values = {chmap.iloc[i]['join_index']: i for i in range(len(chmap))}
-        keys = ['channel_id', 'flange_name', 'slot_id', 'local_id', 'channel_type']
-        defaults = [-1, 'None', -1, -1, 'None']
+        keys = ['channel_id', 'flange_name', 'slot_id', 'local_id', 'channel_type', 'wire_capacitance', 'cable_capacitance']
+        defaults = [-1, 'None', -1, -1, 'None', 0, 0]
         chmap_data = [chmap.iloc[chmap_values[x]][keys] if x in chmap_values.keys() else defaults for x in self.chmap_join_index]
         self.channel_id = np.array([x[0] for x in chmap_data], dtype='int')
         self.flange_name = np.array([x[1] for x in chmap_data], dtype='str')
         self.slot_id = np.array([x[2] for x in chmap_data], dtype='int')
         self.local_id = np.array([x[3] for x in chmap_data], dtype='int')
         self.channel_type = np.array([x[4] for x in chmap_data], dtype='str')
+        self.wire_capacitance = np.array([x[5] for x in chmap_data], dtype='float')
+        self.cable_capacitance = np.array([x[6] for x in chmap_data], dtype='float')
     
     def __repr__(self) -> str:
         """
@@ -354,6 +369,8 @@ class TPDataset:
         result.slot_id = self.slot_id
         result.local_id = self.local_id
         result.channel_type = self.channel_type
+        result.wire_capacitance = self.wire_capacitance
+        result.cable_capacitance = self.cable_capacitance
 
     def __add__(self, other):
         """
@@ -379,6 +396,8 @@ class TPDataset:
         result.slot_id = self.slot_id
         result.local_id = self.local_id
         result.channel_type = self.channel_type
+        result.wire_capacitance = self.wire_capacitance
+        result.cable_capacitance = self.cable_capacitance
 
     def join(self, other):
         """
@@ -411,4 +430,6 @@ class TPDataset:
         result.slot_id = self.slot_id
         result.local_id = self.local_id
         result.channel_type = self.channel_type
+        result.wire_capacitance = self.wire_capacitance
+        result.cable_capacitance = self.cable_capacitance
         return result
