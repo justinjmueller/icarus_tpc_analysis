@@ -122,12 +122,19 @@ class Dataset:
         if metric[0] == '!':
             metric = metric[1:]
         return {'raw_rms': ['RMS [ADC]', (0, 10), 50],
-                'int_rms': ['RMS [ADC]', (0, 10), 50],
+                'int_rms': ['RMS [ADC]', (0, 10), 100],
                 'coh_rms': ['RMS [ADC]', (0, 10), 50],
+                'raw_rms_norm': [r'RMS [ADC / $\mu$F]', (0, 50), 50],
+                'int_rms_norm': [r'RMS [ADC / $\mu$F]', (0, 50), 100],
+                'coh_rms_norm': [r'RMS [ADC / $\mu$F]', (0, 50), 50],
                 'raw_rms_e2eabs': ['Difference [ADC]', (-1.25, 1.25), 50],
                 'raw_rms_c2cabs': ['Difference [ADC]', (-1.25, 1.25), 50],
                 'raw_rms_e2erel': ['Relative Difference', (-0.25, 0.25), 50],
                 'raw_rms_c2crel': ['Relative Difference', (-0.25, 0.25), 50],
+                'int_rms_e2eabs': ['Difference [ADC]', (-1.25, 1.25), 50],
+                'int_rms_c2cabs': ['Difference [ADC]', (-1.25, 1.25), 50],
+                'int_rms_e2erel': ['Relative Difference', (-0.25, 0.25), 50],
+                'int_rms_c2crel': ['Relative Difference', (-0.25, 0.25), 50],
                 'hit_occupancy': ['Hit Occupancy', (0, 5), 25],
                 'mhit_sadc': ['Max Hit Summed ADC [ADC]', (0,1000), 50],
                 'mhit_height': ['Max Hit Height [ADC]', (0,100), 50],
@@ -210,6 +217,9 @@ class Dataset:
         data['tpc'] = data['channel_id'].to_numpy() // 13824
         mask = (data['mhit_height'] <= 25)
         self.noise_data = data.loc[mask]
+        total_capacitance = (self.noise_data['wire_capacitance'] + self.noise_data['cable_capacitance'] + 30) / 1000.0
+        for k in ['raw_rms', 'int_rms', 'coh_rms']:
+            self.noise_data[f'{k}_norm'] = self.noise_data[k] / total_capacitance
         self.median_noise_data = data.loc[mask].groupby('channel_id').median().reset_index()
         self.median_noise_data['flange'] = [flange_map[x] for x in self.median_noise_data['fragment']]
         self.median_noise_data['hit_occupancy'] = data.groupby('channel_id').mean()['hits']
@@ -220,7 +230,10 @@ class Dataset:
             warnings.warn("runtime", RuntimeWarning)
             for k in ['raw_rms', 'int_rms', 'coh_rms', 'pedestal']:
                 median_e2e = group_e2e[k].transform('median').to_numpy()
-                median_c2c = group_c2c[k].transform('median').to_numpy()
+                medians = list()
+                for p in [0,1,2]:
+                    medians.append(np.mean(self.median_noise_data[self.median_noise_data['plane'] == p][k]))
+                median_c2c = np.array(medians)[self.noise_data['plane']]
                 self.noise_data[f'{k}_e2eabs'] = (self.noise_data[k].to_numpy() - median_e2e)
                 self.noise_data[f'{k}_c2cabs'] = (self.noise_data[k].to_numpy() - median_c2c)
                 self.noise_data[f'{k}_e2erel'] = (self.noise_data[k].to_numpy() - median_e2e) / median_e2e
