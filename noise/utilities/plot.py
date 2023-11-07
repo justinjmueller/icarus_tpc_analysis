@@ -260,10 +260,7 @@ def plot_planes(dataset, metric, mtype='e2e', tpc=None, save_path=None) -> None:
     scale = 1.25 if 'abs' in mtype[0] else 0.25
     for pi, p in enumerate(planes):
         for m in mtype:
-            if tpc != None:
-                mask = ((dataset.noise_data['tpc'] == tpc) & (dataset.noise_data['plane'] == pi))
-            else:
-                mask = (dataset.noise_data['plane'] == pi)
+            mask = dataset.get_mask(f'{metric}_{m}', tpc=tpc, plane=pi, wired_only=True)
             label = {'e2e': 'Event-to-Event', 'c2c': 'Channel-to-Channel'}[m[:3]]
             haxs[pi].hist(dataset[f'{metric}_{m}'][mask], range=(-scale,scale), bins=50,
                           histtype='step', density=True, label=label)
