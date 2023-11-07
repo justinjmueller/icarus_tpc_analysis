@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.stats.mstats import trimmed_std
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
@@ -128,7 +129,7 @@ def plot_ffts(datasets, labels, fft_type='raw', tpc=None, save_path=None) -> Non
     if save_path is not None:
         figure.savefig(save_path)
 
-def plot_planes_new(datasets, labels, metrics, title, tpc=None, normalize=False, cap=None, wired_only=False, save_path=None) -> None:
+def plot_planes_new(datasets, labels, metrics, title, tpc=None, normalize=False, cap=None, wired_only=False, save_path=None, annot_type='doublet', trim_frac=0.01) -> None:
     """
     Plots the desired metric(s) for the specified TPC and dataset(s)
     as a set of three 1D histograms.
@@ -153,6 +154,15 @@ def plot_planes_new(datasets, labels, metrics, title, tpc=None, normalize=False,
         Boolean flag for selecting only wired channels.
     save_path: str
         The full path specifying the location to save the plot.
+    annot_type: str
+        The type of annotation to add to the plot.
+        'doublet':  adds the median value for each distribution beneath
+                    each plot.
+        'smear':    adds the smearing fraction necessary to map one
+                    distribution to the other.
+    trim_frac: float
+        The fraction to cut on either tail when calculating the width
+        of the distribution.
     
     Returns
     -------
@@ -170,20 +180,35 @@ def plot_planes_new(datasets, labels, metrics, title, tpc=None, normalize=False,
     
     figure = plt.figure(figsize=(14,6))
     gspec = figure.add_gridspec(16,3)
-    haxs = [figure.add_subplot(gspec[2:13, p]) for p in [0,1,2]]
+    gslow = 2 if annot_type in ['doublet',] else 0
+    haxs = [figure.add_subplot(gspec[gslow:13, p]) for p in [0,1,2]]
     planes = ['Induction 1', 'Induction 2', 'Collection']
+    sigma = list()
+    medians = list()
     for pi, p in enumerate(planes):
         for di, d in enumerate(datasets):
             mask = d[0].get_mask(d[1], tpc=d[2], plane=pi, wired_only=wired_only)
             style = d[0].get_styling(d[1])
             haxs[pi].hist(d[0][d[1]][mask], range=style[1], bins=style[2],
                           histtype='step', label=labels[di], density=normalize)
-            median = np.median(d[0][d[1]][mask])
-            color = plt.rcParams["axes.prop_cycle"].by_key()["color"][di]
-            units = style[0].split('[')[1].split(']')[0] if '[' in style[0] else ''
-            if units == 'Arb.':
-                units = ''
-            haxs[pi].text(0.09+0.45*di, -0.25, f'{median:.2f} {units}', transform=haxs[pi].transAxes, verticalalignment='top', horizontalalignment='left', c=color, size=20)
+            sigma.append(trimmed_std(d[0][d[1]][mask], limits=(trim_frac, trim_frac)))
+            medians.append(np.median(d[0][d[1]][mask]))
+            
+            if annot_type == 'doublet':
+                color = plt.rcParams["axes.prop_cycle"].by_key()["color"][di]
+                units = style[0].split('[')[1].split(']')[0] if '[' in style[0] else ''
+                if units == 'Arb.':
+                    units = ''
+                haxs[pi].text(0.09+0.45*di, -0.25, f'{medians[-1]:.2f} {units}',
+                              transform=haxs[pi].transAxes, verticalalignment='top',
+                              horizontalalignment='left', c=color, size=20)
+        if annot_type == 'smear':
+            smear = np.sqrt(np.square(sigma[2*pi]) - np.square(sigma[2*pi+1]))
+            haxs[pi].text(0.68, 0.90, f'$\sigma_s$: {smear:.3f}',
+                          transform=haxs[pi].transAxes, verticalalignment='top',
+                          horizontalalignment='left', size=20)
+
+
         haxs[pi].set_xlim(style[1])
         haxs[pi].set_xlabel(style[0])
         haxs[pi].set_ylabel('Entries (Arb.)')
