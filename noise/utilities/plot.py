@@ -375,7 +375,7 @@ def plot_crate(datasets, labels, metric='raw_rms', component='WW19', label_mean=
         else:
             c = component
             title = component
-        selected = d['flange'] == c
+        selected = d['flange_name'] == c
         mean = np.mean(d[metric][selected])
         x = 64*d['slot_id'][selected] + d['local_id'][selected]
         label_annotated = f'{labels[di]} ($\mu$: {mean:.2f})' if label_mean else labels[di]
